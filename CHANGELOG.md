@@ -1,3 +1,9 @@
+# 0.7
+
++ Add `--use-shard-id` to use shard id for algorithm rebalance instead index name
++ Add `--skip-attr` used to exclude migration between two nodes that have same attributes
+  
+
 # 0.6
 
 + Add CLI option to temporarily override disk watermarks

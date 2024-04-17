@@ -16,6 +16,9 @@ from .util import (
     get_transient_cluster_settings,
     set_transient_cluster_settings,
     wait_for_no_relocations,
+    parse_attr,
+    matches_attrs,
+    extract_attrs,
 )
 
 
@@ -25,12 +28,18 @@ class BalanceException(click.ClickException):
         super(BalanceException, self).__init__(message)
 
 
-def find_node(nodes, node_name=None):
+def find_node(nodes, node_name=None, skip_attrs={}):
     if not isinstance(nodes, list):
         nodes = list(nodes)
 
     if not node_name:
-        return nodes[0]
+        if not skip_attrs:
+            return nodes[0]
+        else:
+            for node in nodes:
+                if not matches_attrs(node_data.get('attributes'), skip_attrs):
+                    return node
+            raise ValueError(f'Could not find a valid node without {skip_attrs}')
 
     for node in nodes:
         if node['name'] == node_name:
@@ -45,13 +54,17 @@ def attempt_to_find_swap(
     min_node_name=None,
     format_shard_weight_function=lambda weight: weight,
     one_way=False,
+    use_shared_id=False,
+    skip_attrs=[],
+    
 ):
-    ordered_nodes, node_name_to_shards, index_to_node_names = (
+    ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
     )
 
-    min_node = find_node(ordered_nodes, min_node_name)
-    max_node = find_node(reversed(ordered_nodes), max_node_name)
+    min_node = find_node(ordered_nodes, node_name=min_node_name)
+    min_node_skip_attr = extract_attrs(min_node.get('attributes'), skip_attrs)
+    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, ref_node=min_node, skip_attrs=min_node_skip_attr)
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
@@ -68,12 +81,19 @@ def attempt_to_find_swap(
     min_node_shards = node_name_to_shards[min_node['name']]
 
     for shard in reversed(max_node_shards):  # biggest to smallest shard
-        if (
-            shard['id'] not in used_shards
-            and min_node['name'] not in index_to_node_names[shard['index']]
-        ):
-            max_shard = shard
-            break
+        if shard['id'] not in used_shards:
+            if (
+                use_shared_id 
+                and min_node['name'] not in shard_id_to_node_names[shard['id']]
+            ):
+                max_shard = shard
+                break
+            elif (
+                not use_shared_id 
+                and min_node['name'] not in index_to_node_names[shard['index']]
+            ):
+                max_shard = shard
+                break
     else:
         raise BalanceException((
             'Could not find suitable large shard to move to '
@@ -81,12 +101,19 @@ def attempt_to_find_swap(
         ))
 
     for shard in min_node_shards:
-        if (
-            shard['id'] not in used_shards
-            and max_node['name'] not in index_to_node_names[shard['index']]
-        ):
-            min_shard = shard
-            break
+        if shard['id'] not in used_shards:
+            if (
+                use_shared_id 
+                and max_node['name'] not in shard_id_to_node_names[shard['id']]
+            ):
+                min_shard = shard
+                break
+            elif (
+                not use_shared_id 
+                and max_node['name'] not in index_to_node_names[shard['index']]
+            ):
+                min_shard = shard
+                break
     else:
         raise BalanceException((
             'Could not find suitable small shard to move to '
@@ -221,7 +248,7 @@ def print_node_shard_states(
     nodes, shards,
     format_shard_weight_function=format_shard_size,
 ):
-    ordered_nodes, node_name_to_shards, _ = (
+    ordered_nodes, node_name_to_shards, _ , _= (
         combine_nodes_and_shards(nodes, shards)
     )
 
@@ -249,7 +276,10 @@ def make_rebalance_elasticsearch_cli(
     @click.option(
         '--attr',
         multiple=True,
-        help='Node attributes in form key=value.',
+        help=(
+            'Rebalance only on node with attributes specified here. '
+            'Attributes is accepted in format key=value.'
+        ),
     )
     @click.option(
         '--commit',
@@ -298,6 +328,24 @@ def make_rebalance_elasticsearch_cli(
             'shards even when the most full nodes are on the limit.'
         ),
     )
+    @click.option(
+        '--use-shard-id',
+        is_flag=True,
+        default=False,
+        help=(
+            'If passed, we use the shard_id created in runtime instead '
+            'index name for shard algoritms. Without this params if index '
+            'of shard is in the max and min node, shard will be skipped.'
+        ),
+    )
+    @click.option(
+        '--skip-attr',
+        multiple=True,
+        help=(
+            'If specified we avoid rebalance beetween node that have same '
+            'attributes specified here. Attributes are in string format.'
+        ),
+    )
     def rebalance_elasticsearch(
         es_host,
         iterations=1,
@@ -309,16 +357,18 @@ def make_rebalance_elasticsearch_cli(
         min_node=None,
         one_way=False,
         override_watermarks=None,
+        use_shared_id=False,
+        skip_attr=None,
     ):
         # Parse out any attrs
         attrs = {}
         if attr:
-            for a in attr:
-                try:
-                    key, value = a.split('=', 1)
-                except ValueError:
-                    raise BalanceException('Invalid attr, specify as key=value!')
-                attrs[key] = value
+            attrs = parse_attr(attr)
+
+        # Parse out any skip_attrs
+        skip_attrs = []
+        if skip_attr:
+            skip_attrs = skip_attr
 
         # Turn min/max node lists into deque instances
         if min_node:
@@ -396,6 +446,8 @@ def make_rebalance_elasticsearch_cli(
                     min_node_name=min_node[0] if min_node else None,
                     format_shard_weight_function=format_shard_weight_function,
                     one_way=one_way,
+                    use_shared_id=use_shared_id,
+                    skip_attrs=skip_attrs,
                 )
 
                 if reroute_commands:

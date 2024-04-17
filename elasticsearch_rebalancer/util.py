@@ -158,10 +158,12 @@ def get_shards(
 def combine_nodes_and_shards(nodes, shards):
     node_name_to_shards = defaultdict(list)
     index_to_node_names = defaultdict(list)
+    shard_id_to_node_names = defaultdict(list)
 
     for shard in shards:
         node_name_to_shards[shard['node']].append(shard)
         index_to_node_names[shard['index']].append(shard['node'])
+        shard_id_to_node_names[shard['id']].append(shard['node'])
 
     node_name_to_shards = {
         node_name: sorted(shards, key=lambda shard: shard['weight'])
@@ -187,4 +189,25 @@ def combine_nodes_and_shards(nodes, shards):
     for node in ordered_nodes:
         node['weight_percentage'] = round((node['weight'] / max_weight) * 100, 2)
 
-    return ordered_nodes, node_name_to_shards, index_to_node_names
+    return ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names
+
+
+def parse_attr(attributes):
+    attr_map = {}
+    for a in attributes:
+        try:
+            key, value = a.split('=', 1)
+        except ValueError:
+            raise BalanceException('Invalid attr, specify as key=value!')
+        attr_map[key] = value
+    return attr_map
+
+def extract_attrs(attrs, skip_attrs):
+    extract_attr = {}
+    if not attrs or not skip_attrs:
+        return extract_attr
+    
+    for skip_attr in skip_attrs:
+        if attrs.get(skip_attr):
+            extract_attr[skip_attr] = attrs.get(skip_attr)
+    return extract_attr
