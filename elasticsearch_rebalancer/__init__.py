@@ -62,10 +62,10 @@ def attempt_to_find_swap(
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
     )
-
-    min_node = find_node(ordered_nodes, node_name=min_node_name)
-    min_node_skip_attr = extract_attrs(min_node.get('attributes'), skip_attrs)
-    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, skip_attrs=min_node_skip_attr)
+    
+    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name)
+    max_node_skip_attr = extract_attrs(max_node.get('attributes'), skip_attrs)
+    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attrs=max_node_skip_attr)
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
