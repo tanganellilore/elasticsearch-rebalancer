@@ -36,7 +36,7 @@ def get_cluster_settings(es_host):
     return es_request(es_host, '_cluster/settings')
 
 def get_nodes_attributes_map(es_host):
-    nodes_attr = es_request(es_host, '/_cat/nodeattrs?v=true&format=json')
+    nodes_attr = es_request(es_host, '_cat/nodeattrs?v=true&format=json')
     nodes_attr_map = {}
 
     for item in nodes_attr:
