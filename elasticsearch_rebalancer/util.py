@@ -113,6 +113,7 @@ def get_shards(
     es_host,
     attrs=None,
     index_name_filter=None,
+    max_shard_size=None,
     get_shard_weight_function=get_shard_size,
 ):
     indices = es_request(es_host, '_settings')
@@ -149,6 +150,7 @@ def get_shards(
         if (
             shard['state'] != 'STARTED'
             or shard['index'] not in filtered_index_names
+            or (max_shard_size and get_shard_weight_function(shard) > max_shard_size)
         ):
             continue
 

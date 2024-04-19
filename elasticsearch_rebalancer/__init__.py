@@ -29,18 +29,18 @@ class BalanceException(click.ClickException):
         super(BalanceException, self).__init__(message)
 
 
-def find_node(nodes, node_name=None, skip_attrs={}):
+def find_node(nodes, node_name=None, skip_attr_map=None):
     if not isinstance(nodes, list):
         nodes = list(nodes)
 
     if not node_name:
-        if not skip_attrs:
+        if not skip_attr_map:
             return nodes[0]
         else:
             for node in nodes:
-                if not matches_attrs(node.get('attributes'), skip_attrs):
+                if not matches_attrs(node.get('attributes'), skip_attr_map):
                     return node
-            raise ValueError(f'Could not find a valid node without {skip_attrs}')
+            raise ValueError(f'Could not find a valid node without {skip_attr_map}')
 
     for node in nodes:
         if node['name'] == node_name:
@@ -56,7 +56,7 @@ def attempt_to_find_swap(
     format_shard_weight_function=lambda weight: weight,
     one_way=False,
     use_shard_id=False,
-    skip_attrs=[],
+    skip_attrs_list=None,
     
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
@@ -64,8 +64,8 @@ def attempt_to_find_swap(
     )
     
     max_node = find_node(reversed(ordered_nodes), node_name=max_node_name)
-    max_node_skip_attr = extract_attrs(max_node.get('attributes'), skip_attrs)
-    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attrs=max_node_skip_attr)
+    max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
+    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map)
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
@@ -347,6 +347,12 @@ def make_rebalance_elasticsearch_cli(
             'attributes specified here. Attributes are in string format.'
         ),
     )
+    @click.option(
+        '--max-shard-size',
+        default=None,
+        type=int,
+        help='Max shard size in bytes. If a shard is larger than this, it will be skipped.',
+    )
     def rebalance_elasticsearch(
         es_host,
         iterations=1,
@@ -360,6 +366,7 @@ def make_rebalance_elasticsearch_cli(
         override_watermarks=None,
         use_shard_id=False,
         skip_attr=None,
+        max_shard_size=None,
     ):
         # Parse out any attrs
         attrs = {}
@@ -417,6 +424,7 @@ def make_rebalance_elasticsearch_cli(
                 es_host,
                 attrs=attrs,
                 index_name_filter=index_name,
+                max_shard_size=max_shard_size,
                 get_shard_weight_function=get_shard_weight_function,
             )
             if not shards:
@@ -448,7 +456,7 @@ def make_rebalance_elasticsearch_cli(
                     format_shard_weight_function=format_shard_weight_function,
                     one_way=one_way,
                     use_shard_id=use_shard_id,
-                    skip_attrs=skip_attrs,
+                    skip_attrs_list=skip_attrs,
                 )
 
                 if reroute_commands:
