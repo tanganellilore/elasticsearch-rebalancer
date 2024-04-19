@@ -16,10 +16,10 @@ def matches_attrs(attrs, match_attrs):
 
 def es_request(es_host, endpoint, method=requests.get, **kwargs):
     response = method(
-        f'http://{es_host}/{endpoint}',
+        f'{es_host}/{endpoint}',
+        verify=False,
         **kwargs,
     )
-
     response.raise_for_status()
     return response.json()
 
