@@ -37,7 +37,7 @@ def find_node(nodes, node_name=None, skip_attrs={}):
             return nodes[0]
         else:
             for node in nodes:
-                if not matches_attrs(node_data.get('attributes'), skip_attrs):
+                if not matches_attrs(node.get('attributes'), skip_attrs):
                     return node
             raise ValueError(f'Could not find a valid node without {skip_attrs}')
 
@@ -64,7 +64,7 @@ def attempt_to_find_swap(
 
     min_node = find_node(ordered_nodes, node_name=min_node_name)
     min_node_skip_attr = extract_attrs(min_node.get('attributes'), skip_attrs)
-    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, ref_node=min_node, skip_attrs=min_node_skip_attr)
+    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, skip_attrs=min_node_skip_attr)
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
