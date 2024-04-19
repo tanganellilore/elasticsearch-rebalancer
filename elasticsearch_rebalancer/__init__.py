@@ -353,6 +353,16 @@ def make_rebalance_elasticsearch_cli(
         type=int,
         help='Max shard size in bytes. If a shard is larger than this, it will be skipped.',
     )
+    @click.option(
+        '--node-role',
+        default='data',
+        help=(
+            'Filter the nodes for swaps by role. Typically this are the roles '
+            'defined in the elasticsearch.yml file. Generally you can use this '
+            '"hot" or "warm" or "cold" to filter nodes by their role.'
+            'Default is "data", which means all data are considered for rebalance.'
+        )
+    )
     def rebalance_elasticsearch(
         es_host,
         iterations=1,
@@ -367,6 +377,7 @@ def make_rebalance_elasticsearch_cli(
         use_shard_id=False,
         skip_attr=None,
         max_shard_size=None,
+        node_role="data",
     ):
         # Parse out any attrs
         attrs = {}
@@ -412,7 +423,7 @@ def make_rebalance_elasticsearch_cli(
 
         try:
             click.echo('Loading nodes...')
-            nodes = get_nodes(es_host, attrs=attrs)
+            nodes = get_nodes(es_host, role=node_role, attrs=attrs)
             if not nodes:
                 raise BalanceException('No nodes found!')
 
