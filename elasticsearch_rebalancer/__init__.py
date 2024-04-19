@@ -479,6 +479,9 @@ def make_rebalance_elasticsearch_cli(
                 )
                 set_transient_cluster_settings(es_host, previous_settings)
 
-        click.echo(f'# Cluster rebalanced with {len(all_reroute_commands)} reroutes!')
+        if commit:
+            click.echo(f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes!')
+        else:
+            click.echo(f'# Ended rebalanced. Calculated {len(all_reroute_commands)} reroutes!')
         click.echo()
     return rebalance_elasticsearch
