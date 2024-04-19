@@ -54,7 +54,7 @@ def attempt_to_find_swap(
     min_node_name=None,
     format_shard_weight_function=lambda weight: weight,
     one_way=False,
-    use_shared_id=False,
+    use_shard_id=False,
     skip_attrs=[],
     
 ):
@@ -83,13 +83,13 @@ def attempt_to_find_swap(
     for shard in reversed(max_node_shards):  # biggest to smallest shard
         if shard['id'] not in used_shards:
             if (
-                use_shared_id 
+                use_shard_id 
                 and min_node['name'] not in shard_id_to_node_names[shard['id']]
             ):
                 max_shard = shard
                 break
             elif (
-                not use_shared_id 
+                not use_shard_id 
                 and min_node['name'] not in index_to_node_names[shard['index']]
             ):
                 max_shard = shard
@@ -103,13 +103,13 @@ def attempt_to_find_swap(
     for shard in min_node_shards:
         if shard['id'] not in used_shards:
             if (
-                use_shared_id 
+                use_shard_id 
                 and max_node['name'] not in shard_id_to_node_names[shard['id']]
             ):
                 min_shard = shard
                 break
             elif (
-                not use_shared_id 
+                not use_shard_id 
                 and max_node['name'] not in index_to_node_names[shard['index']]
             ):
                 min_shard = shard
@@ -357,7 +357,7 @@ def make_rebalance_elasticsearch_cli(
         min_node=None,
         one_way=False,
         override_watermarks=None,
-        use_shared_id=False,
+        use_shard_id=False,
         skip_attr=None,
     ):
         # Parse out any attrs
@@ -446,7 +446,7 @@ def make_rebalance_elasticsearch_cli(
                     min_node_name=min_node[0] if min_node else None,
                     format_shard_weight_function=format_shard_weight_function,
                     one_way=one_way,
-                    use_shared_id=use_shared_id,
+                    use_shard_id=use_shard_id,
                     skip_attrs=skip_attrs,
                 )
 

@@ -36,10 +36,10 @@ Options:
   --one-way             Disables shard swaps and simply moves max -> min. Note
                         after ES rebalancing is restored ES will attempt to
                         rebalance itself according to it's own heuristics.
-  --use_shard_id        If passed, we use the shard_id created in runtime instead
+  --use-shard-id        If passed, we use the shard_id created in runtime instead
                         index name for shard algoritms. Without this params if index
                         of shard is in the max and min node, shard will be skipped.
-  -skip-attr            If specified we avoid rebalance beetween node that have same 
+  --skip-attr            If specified we avoid rebalance beetween node that have same 
                         attributes specified here. Attributes are in string format.
   --help                Show this message and exit.
 ```
