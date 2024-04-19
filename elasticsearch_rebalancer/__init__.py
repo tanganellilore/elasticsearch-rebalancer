@@ -1,5 +1,6 @@
 from collections import deque
 from time import sleep
+import json
 
 import click
 import requests
@@ -464,11 +465,7 @@ def make_rebalance_elasticsearch_cli(
                 print_execute_reroutes(es_host, all_reroute_commands)
             else:
                 click.echo('No Command will be executed. Below the POST to be executed for reroute:')
-                click.echo('>Command:  \n\
-                            POST /_cluster/reroute \n\
-                            { \n\
-                                "commands": {}\
-                            }'.format(all_reroute_commands))
+                click.echo('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
 
         except requests.HTTPError as e:
             click.echo(click.style(e.response.content, 'yellow'))
