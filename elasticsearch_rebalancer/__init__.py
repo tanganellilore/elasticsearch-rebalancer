@@ -462,6 +462,13 @@ def make_rebalance_elasticsearch_cli(
 
             if commit:
                 print_execute_reroutes(es_host, all_reroute_commands)
+            else:
+                click.echo('No Command will be executed. Below the POST to be executed for reroute:')
+                click.echo('>Command:  \n\
+                            POST /_cluster/reroute \n\
+                            { \n\
+                                "commands": {}\
+                            }'.format(all_reroute_commands))
 
         except requests.HTTPError as e:
             click.echo(click.style(e.response.content, 'yellow'))
