@@ -35,6 +35,24 @@ def get_cluster_health(es_host):
 def get_cluster_settings(es_host):
     return es_request(es_host, '_cluster/settings')
 
+def get_nodes_attributes_map(es_host):
+    nodes_attr = es_request(es_host, '/_cat/nodeattrs?v=true&format=json')
+    nodes_attr_map = {}
+
+    for item in nodes_attr:
+        attr = item['attr']
+        value = item['value']
+        node = item['node']
+
+        if attr not in nodes_attr_map:
+            nodes_attr_map[attr] = {value: [node]}
+        else:
+            if value not in nodes_attr_map[attr]:
+                nodes_attr_map[attr][value] = [node]
+            else:
+                nodes_attr_map[attr][value].append(node)
+    return nodes_attr_map
+
 
 def check_cluster_health(es_host):
     health = get_cluster_health(es_host)
@@ -91,7 +109,7 @@ def set_transient_cluster_settings(es_host, path_to_value):
 def get_nodes(es_host, role="data", attrs=None):
     nodes = es_request(es_host, '_nodes/stats/fs')['nodes']
     filtered_nodes = []
-
+        
     for node_id, node_data in nodes.items():
         if not matches_attrs(node_data.get('attributes'), attrs) or role not in node_data.get('roles', []):
             continue

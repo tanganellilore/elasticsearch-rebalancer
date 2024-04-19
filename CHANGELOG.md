@@ -2,6 +2,9 @@
 
 + Add `--use-shard-id` to use shard id for algorithm rebalance instead index name
 + Add `--skip-attr` used to exclude migration between two nodes that have same attributes
++ Add `--max-shard-size` to skip shards larger than a certain size
++ Add `--node-role` to filter nodes by their role
++ Enhanced the skip-attr check, to avoid swap of a shard that can have a replica in a node that have same attribute (used for some costrain). 
   
 
 # 0.6

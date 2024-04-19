@@ -20,6 +20,7 @@ from .util import (
     parse_attr,
     matches_attrs,
     extract_attrs,
+    get_nodes_attributes_map,
 )
 
 
@@ -49,6 +50,17 @@ def find_node(nodes, node_name=None, skip_attr_map=None):
     raise ValueError(f'Could not find node: {node_name}')
 
 
+def check_skip_attr(curr_node, skip_attrs_list, skip_attr_map, map_id):
+    same_attr = False
+    for skip_attr in skip_attrs_list:
+        curr_skip_attr = skip_attr_map.get(skip_attr)
+        if curr_skip_attr and not same_attr:
+            for node in curr_skip_attr.get((curr_node.get('attributes', {}).get(skip_attr, "None")), []):
+                if node in map_id:
+                    same_attr = True
+    return same_attr
+
+
 def attempt_to_find_swap(
     nodes, shards, used_shards,
     max_node_name=None,
@@ -57,6 +69,7 @@ def attempt_to_find_swap(
     one_way=False,
     use_shard_id=False,
     skip_attrs_list=None,
+    node_skip_attrs_map=None,
     
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
@@ -83,26 +96,49 @@ def attempt_to_find_swap(
 
     for shard in reversed(max_node_shards):  # biggest to smallest shard
         if shard['id'] not in used_shards:
+
+            # Find if the shard to be moved is in a node that has the same attributes to be skipped
+            # e.g. if the replica shard is in a node that has the same rack as the node to be moved to, skip it
+            if node_skip_attrs_map:
+                if use_shard_id:
+                    same_attr = check_skip_attr(min_node, skip_attrs_list, node_skip_attrs_map, shard_id_to_node_names[shard['id']])
+                else:
+                    same_attr = check_skip_attr(min_node, skip_attrs_list, node_skip_attrs_map, index_to_node_names[shard['index']])
+            else:
+                same_attr = False
+
             if (
                 use_shard_id 
                 and min_node['name'] not in shard_id_to_node_names[shard['id']]
+                and not same_attr
             ):
                 max_shard = shard
                 break
             elif (
                 not use_shard_id 
                 and min_node['name'] not in index_to_node_names[shard['index']]
+                and not same_attr
             ):
                 max_shard = shard
                 break
     else:
         raise BalanceException((
             'Could not find suitable large shard to move to '
-            f'{min_node["name"]}!'
+            f'{max_node["name"]}!'
         ))
 
     for shard in min_node_shards:
         if shard['id'] not in used_shards:
+            # Find if the shard to be moved is in a node that has the same attributes to be skipped
+            # e.g. if the replica shard is in a node that has the same rack as the node to be moved to, skip it
+            if node_skip_attrs_map:
+                if use_shard_id:
+                    same_attr = check_skip_attr(max_node, skip_attrs_list, node_skip_attrs_map, shard_id_to_node_names[shard['id']])
+                else:
+                    same_attr = check_skip_attr(max_node, skip_attrs_list, node_skip_attrs_map, index_to_node_names[shard['index']])
+            else:
+                same_attr = False
+                
             if (
                 use_shard_id 
                 and max_node['name'] not in shard_id_to_node_names[shard['id']]
@@ -118,7 +154,7 @@ def attempt_to_find_swap(
     else:
         raise BalanceException((
             'Could not find suitable small shard to move to '
-            f'{max_node["name"]}!'
+            f'{min_node["name"]}!'
         ))
 
     # Update shard + node info according to the reroutes
@@ -453,7 +489,12 @@ def make_rebalance_elasticsearch_cli(
                 return
 
             click.echo('Investigating rebalance options...')
-
+            
+            if skip_attrs:
+                node_skip_attrs_map = get_nodes_attributes_map(es_host)
+            else:
+                node_skip_attrs_map = None
+                
             all_reroute_commands = []
             used_shards = set()
 
@@ -468,6 +509,7 @@ def make_rebalance_elasticsearch_cli(
                     one_way=one_way,
                     use_shard_id=use_shard_id,
                     skip_attrs_list=skip_attrs,
+                    node_skip_attrs_map=node_skip_attrs_map
                 )
 
                 if reroute_commands:
