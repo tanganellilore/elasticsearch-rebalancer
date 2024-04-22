@@ -37,7 +37,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
     if not node_name:
         if not skip_attr_map:
             for node in nodes:
-                if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
+                if max_recovery_per_node and len(node.get('recovery', [])) >= max_recovery_per_node:
                     continue
                 node['recovery'].append({'shard': 'new_shard_allocated'})
                 print(node['name'], len(node.get('recovery', [])))
@@ -45,7 +45,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
         else:
             for node in nodes:
                 
-                if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
+                if max_recovery_per_node and len(node.get('recovery', [])) >= max_recovery_per_node:
                     continue
                 if not matches_attrs(node.get('attributes'), skip_attr_map):
                     node['recovery'].append({'shard': 'new_shard_allocated'})
@@ -55,7 +55,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
 
     for node in nodes:
         if node['name'] == node_name:
-            if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
+            if max_recovery_per_node and len(node.get('recovery', [])) >= max_recovery_per_node:
                 continue
             node['recovery'].append({'shard': 'new_shard_allocated'})
             print(node['name'], len(node.get('recovery', [])))
