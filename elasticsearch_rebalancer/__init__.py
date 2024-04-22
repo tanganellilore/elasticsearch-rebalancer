@@ -39,7 +39,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
             return nodes[0]
         else:
             for node in nodes:
-                if max_recovery_per_node and node.get('recovery', 0) > max_recovery_per_node:
+                if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
                     continue
                 if not matches_attrs(node.get('attributes'), skip_attr_map):
                     return node
