@@ -48,7 +48,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
                 if not matches_attrs(node.get('attributes'), skip_attr_map):
                     node['recovery'].append({'shard': 'new_shard_allocated'})
                     return node
-            raise ValueError(f'Could not find a valid node without {skip_attr_map}')
+            return None
 
     for node in nodes:
         if node['name'] == node_name:
@@ -57,7 +57,7 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
             node['recovery'].append({'shard': 'new_shard_allocated'})
             return node
 
-    raise ValueError(f'Could not find node: {node_name}')
+    return None
 
 
 def check_skip_attr(curr_node, skip_attrs_list, skip_attr_map, map_id):
@@ -86,10 +86,15 @@ def attempt_to_find_swap(
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
     )
-    
+
     max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
+    if not max_node:
+        return None
+
     max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
     min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
+    if not min_node:
+        return None
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
