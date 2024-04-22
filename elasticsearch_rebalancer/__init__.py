@@ -55,6 +55,8 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
 
     for node in nodes:
         if node['name'] == node_name:
+            if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
+                continue
             node['recovery'].append({'shard': 'new_shard_allocated'})
             print(node['name'], len(node.get('recovery', [])))
             return node
