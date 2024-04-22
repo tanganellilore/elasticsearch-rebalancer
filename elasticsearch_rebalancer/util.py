@@ -3,7 +3,6 @@ from fnmatch import fnmatch
 from time import sleep
 
 import requests
-import json
 from urllib3.exceptions import InsecureRequestWarning
 
 # Suppress only the single warning from urllib3 needed.
@@ -138,13 +137,12 @@ def format_shard_size(weight):
  
 def get_recovery(es_host):
     # _cat/recovery?v&active_only=true&h=index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time&s=source_node
-    return es_request(es_host, '_cat/recovery', params=json.dumps({
-        'active_only': True,
+    return es_request(es_host, '_cat/recovery', params={
+        'active_only': 'true',
         'h': 'index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time',
         's': 'source_node',
         'format': 'json',
-        
-    }))
+    })
 
 
 def get_shards(
