@@ -38,17 +38,20 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
         if not skip_attr_map:
             for node in nodes:
                 if not max_recovery_per_node or len(node.get('recovery', [])) <= max_recovery_per_node:
+                    node['recovery'].append({'shard': 'new_shard_allocated'})
                     return node
         else:
             for node in nodes:
                 if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
                     continue
                 if not matches_attrs(node.get('attributes'), skip_attr_map):
+                    node['recovery'].append({'shard': 'new_shard_allocated'})
                     return node
             raise ValueError(f'Could not find a valid node without {skip_attr_map}')
 
     for node in nodes:
         if node['name'] == node_name:
+            node['recovery'].append({'shard': 'new_shard_allocated'})
             return node
 
     raise ValueError(f'Could not find node: {node_name}')
