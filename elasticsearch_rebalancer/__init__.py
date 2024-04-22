@@ -35,8 +35,10 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
         nodes = list(nodes)
 
     if not node_name:
-        if not skip_attr_map and not max_recovery_per_node:
-            return nodes[0]
+        if not skip_attr_map:
+            for node in nodes:
+                if not max_recovery_per_node or len(node.get('recovery', [])) <= max_recovery_per_node:
+                    return node
         else:
             for node in nodes:
                 if max_recovery_per_node and len(node.get('recovery', [])) > max_recovery_per_node:
