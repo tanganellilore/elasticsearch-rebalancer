@@ -138,10 +138,10 @@ def format_shard_size(weight):
 def get_recovery(es_host):
     # _cat/recovery?v&active_only=true&h=index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time&s=source_node
     return es_request(es_host, '_cat/recovery', params={
-        'v': True,
         'active_only': True,
         'h': 'index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time',
         's': 'source_node',
+        'format': 'json',
     })
 
 
