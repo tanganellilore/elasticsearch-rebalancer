@@ -30,15 +30,17 @@ class BalanceException(click.ClickException):
         super(BalanceException, self).__init__(message)
 
 
-def find_node(nodes, node_name=None, skip_attr_map=None):
+def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=None):
     if not isinstance(nodes, list):
         nodes = list(nodes)
 
     if not node_name:
-        if not skip_attr_map:
+        if not skip_attr_map and not max_recovery_per_node:
             return nodes[0]
         else:
             for node in nodes:
+                if max_recovery_per_node and node.get('recovery', 0) > max_recovery_per_node:
+                    continue
                 if not matches_attrs(node.get('attributes'), skip_attr_map):
                     return node
             raise ValueError(f'Could not find a valid node without {skip_attr_map}')
@@ -70,15 +72,16 @@ def attempt_to_find_swap(
     use_shard_id=False,
     skip_attrs_list=None,
     node_skip_attrs_map=None,
-    
+    max_recovery_per_node=None,
+
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
     )
     
-    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name)
+    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
     max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
-    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map)
+    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
 
     min_weight = min_node['weight']
     max_weight = max_node['weight']
@@ -138,7 +141,7 @@ def attempt_to_find_swap(
                     same_attr = check_skip_attr(max_node, skip_attrs_list, node_skip_attrs_map, index_to_node_names[shard['index']])
             else:
                 same_attr = False
-                
+
             if (
                 use_shard_id 
                 and max_node['name'] not in shard_id_to_node_names[shard['id']]
@@ -399,6 +402,12 @@ def make_rebalance_elasticsearch_cli(
             'Default is "data", which means all data are considered for rebalance.'
         )
     )
+    @click.option(
+        '--max-recovery-per-node',
+        default=None,
+        type=int,
+        help='Max number of concurrent recoveries per node. If a node has more recoveries, it will be skipped.',
+    )
     def rebalance_elasticsearch(
         es_host,
         iterations=1,
@@ -414,6 +423,7 @@ def make_rebalance_elasticsearch_cli(
         skip_attr=None,
         max_shard_size=None,
         node_role="data",
+        max_recovery_per_node=None,
     ):
         # Parse out any attrs
         attrs = {}
@@ -509,7 +519,8 @@ def make_rebalance_elasticsearch_cli(
                     one_way=one_way,
                     use_shard_id=use_shard_id,
                     skip_attrs_list=skip_attrs,
-                    node_skip_attrs_map=node_skip_attrs_map
+                    node_skip_attrs_map=node_skip_attrs_map,
+                    max_recovery_per_node=max_recovery_per_node,
                 )
 
                 if reroute_commands:

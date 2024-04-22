@@ -109,13 +109,22 @@ def set_transient_cluster_settings(es_host, path_to_value):
 def get_nodes(es_host, role="data", attrs=None):
     nodes = es_request(es_host, '_nodes/stats/fs')['nodes']
     filtered_nodes = []
-        
+
+    recoveries = get_recovery(es_host)
+
     for node_id, node_data in nodes.items():
         if not matches_attrs(node_data.get('attributes'), attrs) or role not in node_data.get('roles', []):
             continue
 
         node_data['id'] = node_id
+        node_data['recovery'] = []
+        for recovery in recoveries:
+            if recovery['source_node'] == node_data['name'] or recovery['target_node'] == node_data['name']:
+                node_data['recovery'].append(recovery)
+                break
+
         filtered_nodes.append(node_data)
+
     return filtered_nodes
 
 
@@ -125,6 +134,15 @@ def get_shard_size(shard):
 
 def format_shard_size(weight):
     return naturalsize(weight, binary=True)
+ 
+def get_recovery(es_host):
+    # _cat/recovery?v&active_only=true&h=index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time&s=source_node
+    return es_request(es_host, '_cat/recovery', params={
+        'v': True,
+        'active_only': True,
+        'h': 'index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time',
+        's': 'source_node',
+    })
 
 
 def get_shards(
