@@ -121,7 +121,6 @@ def get_nodes(es_host, role="data", attrs=None):
         for recovery in recoveries:
             if recovery['source_node'] == node_data['name'] or recovery['target_node'] == node_data['name']:
                 node_data['recovery'].append(recovery)
-                break
 
         filtered_nodes.append(node_data)
 
