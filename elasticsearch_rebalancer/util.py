@@ -135,7 +135,8 @@ def get_shard_size(shard):
 
 def format_shard_size(weight):
     return naturalsize(weight, binary=True)
- 
+
+
 def get_recovery(es_host):
     # _cat/recovery?v&active_only=true&h=index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time&s=source_node
     return es_request(es_host, '_cat/recovery', params={
@@ -189,14 +190,15 @@ def get_shards(
             or shard['index'] not in filtered_index_names
             or (max_shard_size and get_shard_weight_function(shard) > max_shard_size)
         ):
-            print("skip shard", shard['index'], shard['shard'], shard['state'])
+            # logger.debug(f"skip shard: {shard['index']} {shard['shard']} {shard['node']} {shard['store']}")
             continue
 
         shard['id'] = f'{shard["index"]}-{shard["shard"]}'
         shard['weight'] = get_shard_weight_function(shard)
 
         filtered_shards.append(shard)
-    print("shards", len(shards))
+    # logger.debug(f"Tot shards: {len(shards)}")
+    # logger.debug(f"Tot filtered shards: {len(filtered_shards)}")
     return filtered_shards
 
 
@@ -216,8 +218,8 @@ def combine_nodes_and_shards(nodes, shards):
     }
 
     ordered_nodes = []
-    total_shards = sum(len(shards) for shards in node_name_to_shards.values())
-    print("total_shards", total_shards)
+
+    # logger.debug(f"Total node shards: {total_shards}")
     for node in nodes:
         if node['name'] not in node_name_to_shards:
             continue
