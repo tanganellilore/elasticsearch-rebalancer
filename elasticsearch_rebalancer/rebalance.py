@@ -130,134 +130,133 @@ def rebalance_elasticsearch(
         max_recovery_per_node=None,
     ):
         # Parse out any attrs
-        attrs = {}
-        if attr:
-            attrs = utils.parse_attr(attr)
+    attrs = {}
+    if attr:
+        attrs = utils.parse_attr(attr)
 
-        # Parse out any skip_attrs
-        skip_attrs = []
-        if skip_attr:
-            skip_attrs = skip_attr
+    # Parse out any skip_attrs
+    skip_attrs = []
+    if skip_attr:
+        skip_attrs = skip_attr
 
-        # Turn min/max node lists into deque instances
-        if min_node:
-            min_node = deque(min_node)
-        if max_node:
-            max_node = deque(max_node)
+    # Turn min/max node lists into deque instances
+    if min_node:
+        min_node = deque(min_node)
+    if max_node:
+        max_node = deque(max_node)
 
+    click.echo()
+    click.echo('# Elasticsearch Rebalancer')
+    click.echo(f'> Target: {click.style(es_host, bold=True)}')
+    click.echo()
+
+    if commit:
+        if print_state:
+            raise click.ClickException('Cannot have --commit and --print-state!')
+
+        # Check we have a healthy cluster
+        utils.check_raise_health(es_host)
+
+        click.echo('Disabling cluster rebalance...')
+        settings_to_set = {'cluster.routing.rebalance.enable': 'none'}
+
+        if override_watermarks:
+            click.echo(f'Overriding disk watermarks to: {override_watermarks}')
+            settings_to_set.update({
+                'cluster.routing.allocation.disk.watermark.low': override_watermarks,
+                'cluster.routing.allocation.disk.watermark.high': override_watermarks,
+            })
+
+        # Save the old value to restore later
+        previous_settings = utils.get_transient_cluster_settings(es_host, settings_to_set.keys())
+        utils.set_transient_cluster_settings(es_host, settings_to_set)
+
+    try:
+        click.echo('Loading nodes...')
+        nodes = utils.get_nodes(es_host, role=node_role, attrs=attrs)
+        if not nodes:
+            raise utils.BalanceException('No nodes found!')
+
+        click.echo(f'> Found {len(nodes)} nodes')
         click.echo()
-        click.echo('# Elasticsearch Rebalancer')
-        click.echo(f'> Target: {click.style(es_host, bold=True)}')
+
+        click.echo('Loading shards...')
+        shards = utils.get_shards(
+            es_host,
+            attrs=attrs,
+            index_name_filter=index_name,
+            max_shard_size=max_shard_size
+        )
+        if not shards:
+            raise utils.BalanceException('No shards found!')
+
+        click.echo(f'> Found {len(shards)} shards')
         click.echo()
 
-        if commit:
-            if print_state:
-                raise click.ClickException('Cannot have --commit and --print-state!')
-
-            # Check we have a healthy cluster
-            utils.check_raise_health(es_host)
-
-            click.echo('Disabling cluster rebalance...')
-            settings_to_set = {'cluster.routing.rebalance.enable': 'none'}
-
-            if override_watermarks:
-                click.echo(f'Overriding disk watermarks to: {override_watermarks}')
-                settings_to_set.update({
-                    'cluster.routing.allocation.disk.watermark.low': override_watermarks,
-                    'cluster.routing.allocation.disk.watermark.high': override_watermarks,
-                })
-
-            # Save the old value to restore later
-            previous_settings = utils.get_transient_cluster_settings(es_host, settings_to_set.keys())
-            utils.set_transient_cluster_settings(es_host, settings_to_set)
-
-        try:
-            click.echo('Loading nodes...')
-            nodes = utils.get_nodes(es_host, role=node_role, attrs=attrs)
-            if not nodes:
-                raise utils.BalanceException('No nodes found!')
-
-            click.echo(f'> Found {len(nodes)} nodes')
-            click.echo()
-
-            click.echo('Loading shards...')
-            shards = utils.get_shards(
-                es_host,
-                attrs=attrs,
-                index_name_filter=index_name,
-                max_shard_size=max_shard_size
+        if print_state:
+            click.echo('Nodes ordered by weight:')
+            utils.print_node_shard_states(
+                nodes, shards
             )
-            if not shards:
-                raise utils.BalanceException('No shards found!')
+            return
 
-            click.echo(f'> Found {len(shards)} shards')
+        click.echo('Investigating rebalance options...')
+        
+        if skip_attrs:
+            node_skip_attrs_map = utils.get_nodes_attributes_map(es_host)
+        else:
+            node_skip_attrs_map = None
+            
+        all_reroute_commands = []
+        used_shards = set()
+
+        for i in range(iterations):
+            click.echo(f'> Iteration {i}')
+            reroute_commands = utils.attempt_to_find_swap(
+                nodes, shards,
+                used_shards=used_shards,
+                max_node_name=max_node[0] if max_node else None,
+                min_node_name=min_node[0] if min_node else None,
+                one_way=one_way,
+                use_shard_id=use_shard_id,
+                skip_attrs_list=skip_attrs,
+                node_skip_attrs_map=node_skip_attrs_map,
+                max_recovery_per_node=max_recovery_per_node,
+            )
+
+            if reroute_commands:
+                all_reroute_commands.extend(reroute_commands)
+
             click.echo()
 
-            if print_state:
-                click.echo('Nodes ordered by weight:')
-                utils.print_node_shard_states(
-                    nodes, shards
-                )
-                return
-
-            click.echo('Investigating rebalance options...')
-            
-            if skip_attrs:
-                node_skip_attrs_map = utils.get_nodes_attributes_map(es_host)
-            else:
-                node_skip_attrs_map = None
-                
-            all_reroute_commands = []
-            used_shards = set()
-
-            for i in range(iterations):
-                click.echo(f'> Iteration {i}')
-                reroute_commands = utils.attempt_to_find_swap(
-                    nodes, shards,
-                    used_shards=used_shards,
-                    max_node_name=max_node[0] if max_node else None,
-                    min_node_name=min_node[0] if min_node else None,
-                    format_shard_weight_function=utils.format_shard_weight_function,
-                    one_way=one_way,
-                    use_shard_id=use_shard_id,
-                    skip_attrs_list=skip_attrs,
-                    node_skip_attrs_map=node_skip_attrs_map,
-                    max_recovery_per_node=max_recovery_per_node,
-                )
-
-                if reroute_commands:
-                    all_reroute_commands.extend(reroute_commands)
-
-                click.echo()
-
-                if min_node:
-                    min_node.rotate()
-                if max_node:
-                    max_node.rotate()
-
-            if commit:
-                utils.print_execute_reroutes(es_host, all_reroute_commands)
-            else:
-                click.echo('No Command will be executed. Below the POST to be executed for reroute:')
-                click.echo('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
-
-        except requests.HTTPError as e:
-            click.echo(click.style(e.response.content, 'yellow'))
-            raise utils.BalanceException(f'Invalid ES response: {e.response.status_code}')
-
-        # Always restore the previous rebalance setting
-        finally:
-            if commit:
-                click.echo(
-                    f'Restoring previous settings ({previous_settings})...',
-                )
-                utils.set_transient_cluster_settings(es_host, previous_settings)
+            if min_node:
+                min_node.rotate()
+            if max_node:
+                max_node.rotate()
 
         if commit:
-            click.echo(f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes!')
+            utils.print_execute_reroutes(es_host, all_reroute_commands)
         else:
-            click.echo(f'# Ended rebalanced. Calculated {len(all_reroute_commands)} reroutes!')
-        click.echo()
+            click.echo('No Command will be executed. Below the POST to be executed for reroute:')
+            click.echo('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
+
+    except requests.HTTPError as e:
+        click.echo(click.style(e.response.content, 'yellow'))
+        raise utils.BalanceException(f'Invalid ES response: {e.response.status_code}')
+
+    # Always restore the previous rebalance setting
+    finally:
+        if commit:
+            click.echo(
+                f'Restoring previous settings ({previous_settings})...',
+            )
+            utils.set_transient_cluster_settings(es_host, previous_settings)
+
+    if commit:
+        click.echo(f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes!')
+    else:
+        click.echo(f'# Ended rebalanced. Calculated {len(all_reroute_commands)} reroutes!')
+    click.echo()
 
 
 if __name__ == '__main__':
