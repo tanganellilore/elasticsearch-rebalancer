@@ -128,7 +128,7 @@ def rebalance_elasticsearch(
         max_shard_size=None,
         node_role="data",
         max_recovery_per_node=None,
-    ):
+):
         # Parse out any attrs
     attrs = {}
     if attr:
@@ -195,18 +195,16 @@ def rebalance_elasticsearch(
 
         if print_state:
             click.echo('Nodes ordered by weight:')
-            utils.print_node_shard_states(
-                nodes, shards
-            )
+            utils.print_node_shard_states(nodes)
             return
 
         click.echo('Investigating rebalance options...')
-        
+   
         if skip_attrs:
             node_skip_attrs_map = utils.get_nodes_attributes_map(es_host)
         else:
             node_skip_attrs_map = None
-            
+      
         all_reroute_commands = []
         used_shards = set()
 

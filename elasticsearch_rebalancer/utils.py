@@ -130,6 +130,8 @@ def get_nodes(es_host, role="data", attrs=None):
                 node_data['recovery'].append(recovery)
 
         node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
+        
+        node_data["total_shards"] = node_data.get("indices", {}).get("shard_stats", {}).get("total_count", 0)
 
         filtered_nodes.append(node_data)
 
@@ -315,7 +317,7 @@ def attempt_to_find_swap(
     nodes, shards, used_shards,
     max_node_name=None,
     min_node_name=None,
-    format_shard_weight_function=lambda weight: weight,
+    format_shard_weight_function=format_shard_size,
     one_way=False,
     use_shard_id=False,
     skip_attrs_list=None,
@@ -441,12 +443,12 @@ def attempt_to_find_swap(
         ))
 
     click.echo((
-        f'  maxNode: {max_node["name"]} ({len(max_node_shards)} shards) '
+        f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) '
         f'({format_shard_weight_function(max_weight)} '
         f'-> {format_shard_weight_function(max_node["weight"])})'
     ))
     click.echo((
-        f'  minNode: {min_node["name"]} ({len(min_node_shards)} shards) '
+        f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) '
         f'({format_shard_weight_function(min_weight)} '
         f'-> {format_shard_weight_function(min_node["weight"])})'
     ))
@@ -538,17 +540,13 @@ def print_execute_reroutes(es_host, commands):
 
 
 def print_node_shard_states(
-    nodes, shards,
+    nodes,
     format_shard_weight_function=format_shard_size,
 ):
-    ordered_nodes, node_name_to_shards, _ , _= (
-        combine_nodes_and_shards(nodes, shards)
-    )
-
-    for node in ordered_nodes:
+    for node in nodes:
         click.echo(
             f'> Node: {node["name"]}, '
-            f'shards: {node.get("indices", {}).get("shard_stats", {}).get("total_count", 0)}'
+            f'shards: {node["total_shards"]},'
             f'weight: {format_shard_weight_function(node["weight"])}'
             f' ({node["weight_percentage"]})%',
         )
