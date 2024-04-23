@@ -128,7 +128,9 @@ def get_nodes(es_host, role="data", attrs=None):
 
 
 def get_shard_size(shard):
-    return int(shard['store'])
+    if shard['store']:
+        return int(shard['store'])
+    return 0
 
 
 def format_shard_size(weight):
