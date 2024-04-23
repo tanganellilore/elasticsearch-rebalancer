@@ -195,6 +195,8 @@ def get_shards(
         shard['weight'] = get_shard_weight_function(shard)
 
         filtered_shards.append(shard)
+    print("shards", shards)
+    print("filtered_shards", len(filtered_shards))
     return filtered_shards
 
 
@@ -214,6 +216,8 @@ def combine_nodes_and_shards(nodes, shards):
     }
 
     ordered_nodes = []
+    total_shards = sum(len(shards) for shards in node_name_to_shards.values())
+    print("total_shards", total_shards)
     for node in nodes:
         if node['name'] not in node_name_to_shards:
             continue
