@@ -189,6 +189,7 @@ def get_shards(
             or shard['index'] not in filtered_index_names
             or (max_shard_size and get_shard_weight_function(shard) > max_shard_size)
         ):
+            print("skip shard", shard['index'], shard['shard'], shard['state'])
             continue
 
         shard['id'] = f'{shard["index"]}-{shard["shard"]}'
