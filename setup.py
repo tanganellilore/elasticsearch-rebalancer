@@ -22,7 +22,7 @@ if __name__ == '__main__':
         install_requires=REQUIREMENTS,
         entry_points={
             'console_scripts': (
-                'es-rebalance=elasticsearch_rebalancer.__main__:rebalance_elasticsearch',
+                'es-rebalance=elasticsearch_rebalancer.rebalance:rebalance_elasticsearch',
             ),
         },
     )
