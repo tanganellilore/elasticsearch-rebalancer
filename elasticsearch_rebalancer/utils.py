@@ -114,7 +114,7 @@ def set_transient_cluster_settings(es_host, path_to_value):
 
 
 def get_nodes(es_host, role="data", attrs=None):
-    nodes = es_request(es_host, '_nodes/stats/fs')['nodes']
+    nodes = es_request(es_host, '_nodes/stats')['nodes']
     filtered_nodes = []
 
     recoveries = get_recovery(es_host)
@@ -128,6 +128,8 @@ def get_nodes(es_host, role="data", attrs=None):
         for recovery in recoveries:
             if recovery['source_node'] == node_data['name'] or recovery['target_node'] == node_data['name']:
                 node_data['recovery'].append(recovery)
+
+        node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
 
         filtered_nodes.append(node_data)
 
@@ -231,9 +233,9 @@ def combine_nodes_and_shards(nodes, shards):
         if node['name'] not in node_name_to_shards:
             continue
 
-        node['weight'] = sum(
-            shard['weight'] for shard in node_name_to_shards[node['name']]
-        )
+        # node['weight'] = sum(
+        #     shard['weight'] for shard in node_name_to_shards[node['name']]
+        # )
 
         ordered_nodes.append(node)
 
@@ -546,7 +548,7 @@ def print_node_shard_states(
     for node in ordered_nodes:
         click.echo(
             f'> Node: {node["name"]}, '
-            f'shards: {len(node_name_to_shards[node["name"]])}, '
+            f'shards: {node.get("indices", {}).get("shard_stats", {}).get("total_count", 0)}'
             f'weight: {format_shard_weight_function(node["weight"])}'
             f' ({node["weight_percentage"]})%',
         )
