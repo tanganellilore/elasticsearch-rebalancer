@@ -195,8 +195,7 @@ def get_shards(
         shard['weight'] = get_shard_weight_function(shard)
 
         filtered_shards.append(shard)
-    print("shards", shards)
-    print("filtered_shards", len(filtered_shards))
+    print("shards", len(shards))
     return filtered_shards
 
 
