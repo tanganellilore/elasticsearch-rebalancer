@@ -1,6 +1,7 @@
 from collections import defaultdict
 from fnmatch import fnmatch
 import time
+import json
 
 import requests
 import click
@@ -12,9 +13,9 @@ requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 from humanize import naturalsize
 
 
-class BalanceException(click.ClickException):
+class BalanceException(Exception):
     def __init__(self, message):
-        message = click.style(message, 'red')
+        # message = click.style(message, 'red')
         super(BalanceException, self).__init__(message)
 
 
@@ -26,13 +27,16 @@ def matches_attrs(attrs, match_attrs):
 
 
 def es_request(es_host, endpoint, method=requests.get, **kwargs):
-    response = method(
+    try:
+        response = method(
         f'{es_host}/{endpoint}',
         verify=False,
         **kwargs,
-    )
-    response.raise_for_status()
-    return response.json()
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as e:
+        raise BalanceException(f'Failed to fetch data from ES: {e}')
 
 
 def get_cluster_health(es_host):
@@ -316,7 +320,7 @@ def check_skip_attr(curr_node, skip_attrs_list, skip_attr_map, map_id):
 
 
 def attempt_to_find_swap(
-    nodes, shards, used_shards,
+    nodes, shards, used_shards, logger,
     max_node_name=None,
     min_node_name=None,
     format_shard_weight_function=format_shard_size,
@@ -325,7 +329,7 @@ def attempt_to_find_swap(
     skip_attrs_list=None,
     node_skip_attrs_map=None,
     max_recovery_per_node=None,
-
+    max_diff=0,
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
@@ -343,13 +347,20 @@ def attempt_to_find_swap(
     min_weight = min_node['weight']
     max_weight = max_node['weight']
     spread_used = round(max_weight - min_weight, 2)
-
     click.echo((
         f'> Weight used over {len(nodes)} nodes: '
         f'min={format_shard_weight_function(min_weight)}, '
         f'max={format_shard_weight_function(max_weight)}, '
         f'spread={format_shard_weight_function(spread_used)}'
     ))
+
+    if max_diff:
+        if spread_used < max_diff:
+            print_and_log(logger, "")
+            print_and_log(logger, f'Spread is less than max diff: {format_shard_weight_function(spread_used)} < {format_shard_weight_function(max_diff)}')
+            print('Cluster is balanced...wait')
+            return []
+
 
     max_node_shards = node_name_to_shards[max_node['name']]
     min_node_shards = node_name_to_shards[min_node['name']]
@@ -497,64 +508,48 @@ def check_raise_health(es_host):
         raise BalanceException(f'{e}')
 
 
-def print_execute_reroutes(es_host, commands):
+def wait_cluster_health(es_host, logger):
+    while True:
+        try:
+            check_cluster_health(es_host)
+        except Exception as e:
+            print_and_log(logger, f"Cluster health check failed: {e}, Waiting for 60s...")
+            time.sleep(60)
+        else:
+            break
+
+def execute_reroutes(es_host, commands, logger):
     try:
         execute_reroute_commands(es_host, commands)
     except requests.HTTPError as e:
-        if e.response.status_code != 400:
-            raise
-        click.echo(e)
+        print_and_log(logger, f'Failed to execute reroute commands: {e}')
+        return False
     # Parallel reroute worked - so just wait & return
     else:
-        for command in commands:
-            print_command(command)
+        print_command('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(commands)+'\n}')
 
-        click.echo('Waiting for relocations to complete...')
+        print_and_log(logger, 'Waiting for relocations to complete...')
         wait_for_no_relocations(es_host)
-        return
-
-    # Now try to execute the reroutes one by one - it's likely that ES rejected the
-    # parallel re-route because it would push the max node over the disk threshold.
-    # So now attempt to reroute one shard at a time - first the big shard off the
-    # big node, which should make space for the returning shard.
-    if not click.confirm(click.style(
-        'Parallel rerouting failed! Attempt shard by shard?',
-        'yellow',
-    )):
-        raise BalanceException('User exited serial rerouting!')
-
-    cluster_update_interval = get_transient_cluster_settings(
-        es_host, 'cluster.info.update.interval',
-    )['cluster.info.update.interval'] or '30s'
-
-    cluster_update_interval = int(cluster_update_interval[:-1])
-
-    for i, command in enumerate(commands, 1):
-        print_command(command)
-        execute_reroute_commands(es_host, [command])
-
-        click.echo(
-            f'Waiting for relocation to complete ({i}/{len(commands)})...',
-        )
-        wait_for_no_relocations(es_host)
-        check_raise_health(es_host)  # check the cluster is still good
-        # Wait for minimum update interval or ES might still think there's not
-        # enough space for the next reroute.
-        time.sleep(cluster_update_interval + 1)
+        return True
 
 
 def print_node_shard_states(
     nodes,
+    logger,
     format_shard_weight_function=format_shard_size,
 ):
     for node in nodes:
-        click.echo(
-            f'> Node: {node["name"]}, '
-            f'shards: {node["total_shards"]},'
-            f'weight: {format_shard_weight_function(node["weight"])}'
-            f' ({node["weight_percentage"]})%',
+        print_and_log(logger, 
+            f'\n> Node: {node["name"]},\
+            \nshards: {node["total_shards"]},\
+            \nweight: {format_shard_weight_function(node["weight"])} \
+            ({node["weight_percentage"]})%'
         )
 
 def print_and_log(logger, message):
     logger(message)
-    click.echo(message)
+    # click.echo(message)
+
+def sleep(seconds, logger):
+    print_and_log(logger, f'Sleeping for {seconds} seconds...')
+    time.sleep(seconds)
