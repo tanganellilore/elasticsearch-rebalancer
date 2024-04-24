@@ -311,7 +311,7 @@ def rebalance_elasticsearch(
                 rebalance_elasticsearch(
                     es_client,
                     es_user=es_user,
-                    es_pwd=es_pwd,
+                    es_pwd=es_password,
                     iterations=iterations,
                     used_shards=used_shards,
                     attr=attr,

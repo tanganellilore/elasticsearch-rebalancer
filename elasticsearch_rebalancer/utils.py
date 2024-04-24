@@ -486,6 +486,7 @@ def check_raise_health(es_client):
 
 
 def wait_cluster_health(es_client, logger):
+    print_and_log(logger.info, "> Checking cluster health...")
     while True:
         try:
             check_cluster_health(es_client)
@@ -497,6 +498,7 @@ def wait_cluster_health(es_client, logger):
 
 def execute_reroutes(es_client, commands, logger):
     try:
+        print_and_log(logger.info, "> Executing reroute...")
         execute_reroute_commands(es_client, commands)
     except requests.HTTPError as e:
         print_and_log(logger, f'Failed to execute reroute commands: {e}')
