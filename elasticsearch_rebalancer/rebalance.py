@@ -185,16 +185,13 @@ def rebalance_elasticsearch(
         min_diff=0,
         disable_rebalance=False,
 ):
-    try:
-        if es_user and es_pwd:
-            es_client = Elasticsearch(
-                es_host, http_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
-                request_timeout=60)
-        else:
-            es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
-    except Exception as e:
-        utils.print_and_log(logger.error, f'Error connecting to Elasticsearch: {e}')
-        exit(1)
+    if es_user and es_pwd:
+        es_client = Elasticsearch(
+            es_host, http_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
+            request_timeout=60)
+    else:
+        es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
+
 
     # Parse out any attrs
     attrs = {}
@@ -213,6 +210,7 @@ def rebalance_elasticsearch(
         max_node = deque(max_node)
 
     utils.print_and_log(logger.info, '# Elasticsearch Rebalancer')
+    utils.print_and_log(logger.info, f'> User: {es_user}')
     utils.print_and_log(logger.info, f'> Target: {click.style(es_client, bold=True)}')
 
     if commit:
