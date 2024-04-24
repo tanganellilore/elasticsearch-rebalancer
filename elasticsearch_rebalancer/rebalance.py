@@ -30,8 +30,8 @@ logger.addHandler(ch)
     help='Elasticsearch user.',
 )
 @click.option(
-    '--es-pwd',
-    envvar='ES_PWD',
+    '--es-password',
+    envvar='ES_PASSWORD',
     default=None,
     help='Elasticsearch password.',
 )
@@ -187,7 +187,7 @@ def rebalance_elasticsearch(
 ):
     if es_user and es_pwd:
         es_client = Elasticsearch(
-            es_host, http_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
+            es_host, basic_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
             request_timeout=60)
     else:
         es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
