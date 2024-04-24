@@ -436,13 +436,13 @@ def attempt_to_find_swap(
         print_and_log(logger.info, f'> Recommended move for: {max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])})')
     else:
         print_and_log(logger.info, f'> Recommended swap for: {max_shard["id"]} \
-            ({format_shard_weight_function(max_shard["weight"])}) <> {min_shard["id"]} \
-            ({format_shard_weight_function(min_shard["weight"])})')
+({format_shard_weight_function(max_shard["weight"])}) <> {min_shard["id"]} \
+({format_shard_weight_function(min_shard["weight"])})')
     
     print_and_log(logger.info, f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) \
-        ({format_shard_weight_function(max_weight)} -> {format_shard_weight_function(max_node["weight"])})')
+({format_shard_weight_function(max_weight)} -> {format_shard_weight_function(max_node["weight"])})')
     print_and_log(logger.info, f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) \
-        ({format_shard_weight_function(min_weight)} -> {format_shard_weight_function(min_node["weight"])})'
+({format_shard_weight_function(min_weight)} -> {format_shard_weight_function(min_node["weight"])})\n'
     )
     
 
