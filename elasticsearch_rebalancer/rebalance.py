@@ -73,8 +73,8 @@ logger.addHandler(ch)
 )
 @click.option(
     '--override-watermarks',
-    is_flag=False,
-    default=False
+    is_flag=True,
+    default=False,
     help=(
         'Temporarily override the Elasticsearch low & high disk '
         'watermark settings. Makes it possible to parallel swap '
