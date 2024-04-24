@@ -292,6 +292,8 @@ def rebalance_elasticsearch(
 
             if reroute_commands:
                 all_reroute_commands.extend(reroute_commands)
+            else:
+                break
 
             if min_node:
                 min_node.rotate()
@@ -306,8 +308,8 @@ def rebalance_elasticsearch(
                 utils.print_and_log(logger.info, '# Reroute Performed')
 
             if infinite_loop:
-                utils.print_and_log(logger.info, '# Infinite loop enabled. Sleeping for 10 seconds before next iteration...')
-                utils.sleep(10, logger)
+                utils.print_and_log(logger.info, '# Infinite loop enabled. Sleeping for 60 seconds before next iteration...')
+                utils.sleep(60, logger)
                 rebalance_elasticsearch(
                     es_client,
                     es_user=es_user,
