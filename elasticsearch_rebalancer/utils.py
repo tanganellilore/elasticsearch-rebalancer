@@ -347,12 +347,12 @@ def attempt_to_find_swap(
     min_weight = min_node['weight']
     max_weight = max_node['weight']
     spread_used = round(max_weight - min_weight, 2)
-    click.echo((
-        f'> Weight used over {len(nodes)} nodes: '
-        f'min={format_shard_weight_function(min_weight)}, '
-        f'max={format_shard_weight_function(max_weight)}, '
-        f'spread={format_shard_weight_function(spread_used)}'
-    ))
+
+    print_and_log(logger.info, f'> Weight used over {len(nodes)} nodes: \
+        min={format_shard_weight_function(min_weight)}, \
+        max={format_shard_weight_function(max_weight)}, \
+        spread={format_shard_weight_function(spread_used)}'
+    )
 
     if min_diff:
         if spread_used < min_diff:
@@ -445,27 +445,18 @@ def attempt_to_find_swap(
             return None
 
     if one_way:
-        click.echo((
-            '> Recommended move for: '
-            f'{max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])})'
-        ))
+        print_and_log(logger.info, f'> Recommended move for: {max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])})')
     else:
-        click.echo((
-            '> Recommended swap for: '
-            f'{max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])}) <> '
-            f'{min_shard["id"]} ({format_shard_weight_function(min_shard["weight"])})'
-        ))
-
-    click.echo((
-        f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) '
-        f'({format_shard_weight_function(max_weight)} '
-        f'-> {format_shard_weight_function(max_node["weight"])})'
-    ))
-    click.echo((
-        f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) '
-        f'({format_shard_weight_function(min_weight)} '
-        f'-> {format_shard_weight_function(min_node["weight"])})\n'
-    ))
+        print_and_log(logger.info, f'> Recommended swap for: {max_shard["id"]} \
+            ({format_shard_weight_function(max_shard["weight"])}) <> {min_shard["id"]} \
+            ({format_shard_weight_function(min_shard["weight"])})')
+    
+    print_and_log(logger.info, f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) \
+        ({format_shard_weight_function(max_weight)} -> {format_shard_weight_function(max_node["weight"])})')
+    print_and_log(logger.info, f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) \
+        ({format_shard_weight_function(min_weight)} -> {format_shard_weight_function(min_node["weight"])})'
+    )
+    
 
     reroute_commands = [
         {
@@ -491,12 +482,11 @@ def attempt_to_find_swap(
     return reroute_commands
 
 
-def print_command(command):
+def print_command(command, logger):
     args = command['move']
-    click.echo((
-        f'> Executing reroute of {args["index"]}-{args["shard"]} '
-        f'from {args["from_node"]} -> {args["to_node"]}'
-    ))
+    print_and_log(logger.info, f'> Executing reroute of {args["index"]}-{args["shard"]} \
+        from {args["from_node"]} -> {args["to_node"]}'
+    )
 
 
 def check_raise_health(es_host):
@@ -525,7 +515,7 @@ def execute_reroutes(es_host, commands, logger):
         return False
     # Parallel reroute worked - so just wait & return
     else:
-        print_command('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(commands)+'\n}')
+        print_command('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(commands)+'\n}', logger)
 
         print_and_log(logger, 'Waiting for relocations to complete...')
         wait_for_no_relocations(es_host)
@@ -547,7 +537,6 @@ def print_node_shard_states(
 
 def print_and_log(logger, message):
     logger(message)
-    # click.echo(message)
 
 def sleep(seconds, logger):
     print_and_log(logger, f'Sleeping for {seconds} seconds...')
