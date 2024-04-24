@@ -500,13 +500,13 @@ def execute_reroutes(es_client, commands, logger):
         print_and_log(logger.info, "> Executing reroute...")
         execute_reroute_commands(es_client, commands)
     except Exception as e:
-        print_and_log(logger, f'Failed to execute reroute commands: {e}')
+        print_and_log(logger.info, f'Failed to execute reroute commands: {e}')
         return False
     # Parallel reroute worked - so just wait & return
     else:
         for command in commands:
             print_command(command, logger)
-        print_and_log(logger, 'Waiting for relocations to complete...')
+        print_and_log(logger.info, 'Waiting for relocations to complete...')
         wait_for_no_relocations(es_client, logger)
         return True
 
