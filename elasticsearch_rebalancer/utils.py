@@ -39,15 +39,15 @@ def es_request(es_host, endpoint, method=requests.get, **kwargs):
         raise BalanceException(f'Failed to fetch data from ES: {e}')
 
 
-def get_cluster_health(es_host):
-    return es_request(es_host, '_cluster/health')
+def get_cluster_health(es_client):
+    return es_client.cluster.health()
 
 
-def get_cluster_settings(es_host):
-    return es_request(es_host, '_cluster/settings')
+def get_cluster_settings(es_client):
+    return  es_client.cluster.get_settings()
 
-def get_nodes_attributes_map(es_host):
-    nodes_attr = es_request(es_host, '_cat/nodeattrs?v=true&format=json')
+def get_nodes_attributes_map(es_client):
+    nodes_attr = es_client.cat.nodeattrs(format='json')
     nodes_attr_map = {}
 
     for item in nodes_attr:
@@ -65,8 +65,8 @@ def get_nodes_attributes_map(es_host):
     return nodes_attr_map
 
 
-def check_cluster_health(es_host):
-    health = get_cluster_health(es_host)
+def check_cluster_health(es_client):
+    health = get_cluster_health(es_client)
 
     if health['status'] != 'green':
         raise Exception('ES is not green!')
@@ -76,9 +76,9 @@ def check_cluster_health(es_host):
         raise Exception(f'ES is already relocating {relocating_shards} shards!')
 
 
-def wait_for_no_relocations(es_host):
+def wait_for_no_relocations(es_client):
     while True:
-        health = get_cluster_health(es_host)
+        health = get_cluster_health(es_client)
 
         relocating_shards = health['relocating_shards']
         if not relocating_shards:
@@ -87,14 +87,12 @@ def wait_for_no_relocations(es_host):
         time.sleep(10)
 
 
-def execute_reroute_commands(es_host, commands):
-    es_request(es_host, '_cluster/reroute', method=requests.post, json={
-        'commands': commands,
-    })
+def execute_reroute_commands(es_client, commands):
+    return es_client.cluster.reroute(commands=commands)
 
 
-def get_transient_cluster_settings(es_host, paths):
-    settings = get_cluster_settings(es_host)
+def get_transient_cluster_settings(es_client, paths):
+    settings = get_cluster_settings(es_client)
     path_to_value = {}
 
     for path in paths:
@@ -111,17 +109,15 @@ def get_transient_cluster_settings(es_host, paths):
     return path_to_value
 
 
-def set_transient_cluster_settings(es_host, path_to_value):
-    es_request(es_host, '_cluster/settings', method=requests.put, json={
-        'transient': path_to_value,
-    })
+def set_transient_cluster_settings(es_client, path_to_value):
+    es_client.cluster.put_settings(transient=path_to_value)
 
 
-def get_nodes(es_host, role="data", attrs=None):
-    nodes = es_request(es_host, '_nodes/stats')['nodes']
+def get_nodes(es_client, role="data", attrs=None):
+    nodes = es_client.nodes.stats()['nodes']
     filtered_nodes = []
 
-    recoveries = get_recovery(es_host)
+    recoveries = get_recovery(es_client)
 
     for node_id, node_data in nodes.items():
         if not matches_attrs(node_data.get('attributes'), attrs) or role not in node_data.get('roles', []):
@@ -134,7 +130,7 @@ def get_nodes(es_host, role="data", attrs=None):
                 node_data['recovery'].append(recovery)
 
         node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
-        
+
         node_data["total_shards"] = node_data.get("indices", {}).get("shard_stats", {}).get("total_count", 0)
 
         filtered_nodes.append(node_data)
@@ -152,24 +148,22 @@ def format_shard_size(weight):
     return naturalsize(weight, binary=True)
 
 
-def get_recovery(es_host):
+def get_recovery(es_client):
     # _cat/recovery?v&active_only=true&h=index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time&s=source_node
-    return es_request(es_host, '_cat/recovery', params={
-        'active_only': 'true',
-        'h': 'index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time',
-        's': 'source_node',
-        'format': 'json',
-    })
+    return es_client.cat.recovery(format='json',
+                                  active_only=True,
+                                  h='index,shard,source_node,target_node,stage,bytes_percent,translog_ops_percent,time',
+                                  s='source_node')
 
 
 def get_shards(
-    es_host,
+    es_client,
     attrs=None,
     index_name_filter=None,
     max_shard_size=None,
     get_shard_weight_function=get_shard_size,
 ):
-    indices = es_request(es_host, '_settings')
+    indices = es_client.indices.get_settings()
 
     filtered_index_names = []
 
@@ -189,13 +183,7 @@ def get_shards(
 
         filtered_index_names.append(index_name)
 
-    shards = es_request(
-        es_host, '_cat/shards',
-        params={
-            'format': 'json',
-            'bytes': 'b',
-        },
-    )
+    shards = es_client.cat.shards(format='json', bytes='b')
 
     filtered_shards = []
 
@@ -489,27 +477,27 @@ def print_command(command, logger):
     )
 
 
-def check_raise_health(es_host):
+def check_raise_health(es_client):
     # Check we're good to go
     try:
-        check_cluster_health(es_host)
+        check_cluster_health(es_client)
     except Exception as e:
         raise BalanceException(f'{e}')
 
 
-def wait_cluster_health(es_host, logger):
+def wait_cluster_health(es_client, logger):
     while True:
         try:
-            check_cluster_health(es_host)
+            check_cluster_health(es_client)
         except Exception as e:
             print_and_log(logger.warning, f"Cluster health check failed: {e}, Waiting for 60s...")
             time.sleep(60)
         else:
             break
 
-def execute_reroutes(es_host, commands, logger):
+def execute_reroutes(es_client, commands, logger):
     try:
-        execute_reroute_commands(es_host, commands)
+        execute_reroute_commands(es_client, commands)
     except requests.HTTPError as e:
         print_and_log(logger, f'Failed to execute reroute commands: {e}')
         return False
@@ -518,7 +506,7 @@ def execute_reroutes(es_host, commands, logger):
         print_command('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(commands)+'\n}', logger)
 
         print_and_log(logger, 'Waiting for relocations to complete...')
-        wait_for_no_relocations(es_host)
+        wait_for_no_relocations(es_client)
         return True
 
 

@@ -1,9 +1,13 @@
 from collections import deque
 import json
 import logging
+import warnings
 
 import click
+from elasticsearch import Elasticsearch
+
 from . import utils
+
 
 # create logger with loglevel
 logger = logging.getLogger("elasticsearch_rebalancer")
@@ -18,6 +22,20 @@ logger.addHandler(ch)
 
 @click.command()
 @click.argument('es_host')
+# add auth params
+@click.option(
+    '--es-user',
+    envvar='ES_USER',
+    default=None,
+    help='Elasticsearch user.',
+)
+@click.option(
+    '--es-pwd',
+    envvar='ES_PWD',
+    default=None,
+    help='Elasticsearch password.',
+)
+
 @click.option(
     '--iterations',
     default=1,
@@ -146,6 +164,8 @@ logger.addHandler(ch)
 
 def rebalance_elasticsearch(
         es_host,
+        es_user=None,
+        es_pwd=None,
         iterations=1,
         used_shards=None,
         attr=None,
@@ -165,6 +185,17 @@ def rebalance_elasticsearch(
         min_diff=0,
         disable_rebalance=False,
 ):
+    try:
+        if es_user and es_pwd:
+            es_client = Elasticsearch(
+                es_host, http_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
+                request_timeout=60)
+        else:
+            es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
+    except Exception as e:
+        utils.print_and_log(logger.error, f'Error connecting to Elasticsearch: {e}')
+        exit(1)
+
     # Parse out any attrs
     attrs = {}
     if attr:
@@ -182,14 +213,14 @@ def rebalance_elasticsearch(
         max_node = deque(max_node)
 
     utils.print_and_log(logger.info, '# Elasticsearch Rebalancer')
-    utils.print_and_log(logger.info, f'> Target: {click.style(es_host, bold=True)}')
+    utils.print_and_log(logger.info, f'> Target: {click.style(es_client, bold=True)}')
 
     if commit:
         if print_state:
             raise click.ClickException('Cannot have --commit and --print-state!')
 
         # Check we have a healthy cluster
-        utils.wait_cluster_health(es_host, logger)
+        utils.wait_cluster_health(es_client, logger)
 
         settings_to_set = {}
         if disable_rebalance:
@@ -204,14 +235,14 @@ def rebalance_elasticsearch(
             })
 
         # Save the old value to restore later
-        previous_settings = utils.get_transient_cluster_settings(es_host, settings_to_set.keys())
+        previous_settings = utils.get_transient_cluster_settings(es_client, settings_to_set.keys())
 
         if disable_rebalance or override_watermarks:
-            utils.set_transient_cluster_settings(es_host, settings_to_set)
+            utils.set_transient_cluster_settings(es_client, settings_to_set)
 
     try:
         utils.print_and_log(logger.debug, 'Loading nodes...')
-        nodes = utils.get_nodes(es_host, role=node_role, attrs=attrs)
+        nodes = utils.get_nodes(es_client, role=node_role, attrs=attrs)
         if not nodes:
             utils.print_and_log(logger.error, 'No nodes found! Exit')
             exit(1)
@@ -220,7 +251,7 @@ def rebalance_elasticsearch(
 
         utils.print_and_log(logger.debug, 'Loading shards...')
         shards = utils.get_shards(
-            es_host,
+            es_client,
             attrs=attrs,
             index_name_filter=index_name,
             max_shard_size=max_shard_size
@@ -239,7 +270,7 @@ def rebalance_elasticsearch(
         utils.print_and_log(logger.debug, 'Investigating rebalance options...')
 
         if skip_attrs:
-            node_skip_attrs_map = utils.get_nodes_attributes_map(es_host)
+            node_skip_attrs_map = utils.get_nodes_attributes_map(es_client)
         else:
             node_skip_attrs_map = None
 
@@ -270,7 +301,7 @@ def rebalance_elasticsearch(
                 max_node.rotate()
 
         if commit:
-            reroute_result = utils.execute_reroutes(es_host, all_reroute_commands, logger)
+            reroute_result = utils.execute_reroutes(es_client, all_reroute_commands, logger)
             if not reroute_result:
                 raise utils.BalanceException('Error during reroute')
             else:
@@ -280,7 +311,9 @@ def rebalance_elasticsearch(
                 utils.print_and_log(logger.info, '# Infinite loop enabled. Sleeping for 10 seconds before next iteration...')
                 utils.sleep(10, logger)
                 rebalance_elasticsearch(
-                    es_host,
+                    es_client,
+                    es_user=es_user,
+                    es_pwd=es_pwd,
                     iterations=iterations,
                     used_shards=used_shards,
                     attr=attr,
@@ -310,7 +343,7 @@ def rebalance_elasticsearch(
                 utils.print_and_log(logger.info, '>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
 
     except Exception as e:
-        utils.print_and_log(logger.error, e)
+        utils.print_and_log(logger.error, f"Error on rebalance: {e}")
         exit(1)
 
     # Always restore the previous rebalance setting
@@ -318,7 +351,7 @@ def rebalance_elasticsearch(
         if commit:
             if disable_rebalance or override_watermarks:
                 utils.print_and_log(logger.info, f'Restoring previous settings ({previous_settings})...')
-                utils.set_transient_cluster_settings(es_host, previous_settings)
+                utils.set_transient_cluster_settings(es_client, previous_settings)
 
     if commit:
         utils.print_and_log(logger.info, f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes!')

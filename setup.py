@@ -4,6 +4,7 @@ REQUIREMENTS = (
     'click',
     'humanize',
     'requests',
+    'elasticsearch',
 )
 
 
