@@ -23,143 +23,57 @@ logger.addHandler(ch)
 @click.command()
 @click.argument('es_host')
 # add auth params
-@click.option(
-    '--es-user',
-    envvar='ES_USER',
-    default=None,
-    help='Elasticsearch user.',
-)
-@click.option(
-    '--es-password',
-    envvar='ES_PASSWORD',
-    default=None,
-    help='Elasticsearch password.',
-)
+@click.option('--es-user', envvar='ES_USER', default=None, help='Elasticsearch user.')
+@click.option('--es-password', envvar='ES_PASSWORD', default=None, help='Elasticsearch password.')
 
-@click.option(
-    '--iterations',
-    default=1,
-    type=int,
-    help='Number of iterations (swaps) to execute.',
-)
-@click.option(
-    '--attr',
-    multiple=True,
-    help=(
+@click.option('--iterations', default=1, type=int, help='Number of iterations (swaps) to execute.')
+@click.option('--attr', multiple=True, help=(
         'Rebalance only on node with attributes specified here. '
         'Attributes is accepted in format key=value.'
-    ),
-)
-@click.option(
-    '--commit',
-    is_flag=True,
-    default=False,
-    help='Execute the shard reroutes (default print only).',
-)
-@click.option(
-    '--print-state',
-    is_flag=True,
-    default=False,
-    help='Print the current nodes & weights and exit.',
-)
-@click.option(
-    '--index-name',
-    default=None,
-    help='Filter the indices for swaps by name, supports wildcards.',
-)
-@click.option(
-    '--max-node',
-    default=None,
-    multiple=True,
-    help='Force the max node to consider for shard swaps.',
-)
-@click.option(
-    '--min-node',
-    default=None,
-    multiple=True,
-    help='Force the min node to consider for shard swaps.',
-)
-@click.option(
-    '--one-way',
-    is_flag=True,
-    default=False,
-    help=(
+    ))
+@click.option('--commit', default=False, is_flag=True, help='Execute the shard reroutes (default print only).')
+@click.option('--print-state', default=False, is_flag=True, help='Print the current nodes & weights and exit.')
+@click.option('--index-name', default=None, help='Filter the indices for swaps by name, supports wildcards.')
+@click.option('--max-node', default=None, multiple=True, help='Force the max node to consider for shard swaps.')
+@click.option('--min-node', default=None, multiple=True, help='Force the min node to consider for shard swaps.')
+@click.option('--one-way', default=False, is_flag=True, help=(
         'Disables shard swaps and simply moves max -> min. '
         'Note after ES rebalancing is restored ES will attempt '
         "to rebalance itself according to it's own heuristics."
-    ),
-)
-@click.option(
-    '--override-watermarks',
-    is_flag=True,
-    default=False,
-    help=(
+    ))
+@click.option('--override-watermarks', default=False, is_flag=True, help=(
         'Temporarily override the Elasticsearch low & high disk '
         'watermark settings. Makes it possible to parallel swap '
         'shards even when the most full nodes are on the limit.'
-    ),
-)
-@click.option(
-    '--use-shard-id',
-    is_flag=True,
-    default=False,
-    help=(
+    ))
+@click.option('--use-shard-id', default=False, is_flag=True, help=(
         'If passed, we use the shard_id created in runtime instead '
         'index name for shard algoritms. Without this params if index '
         'of shard is in the max and min node, shard will be skipped.'
-    ),
-)
-@click.option(
-    '--skip-attr',
-    multiple=True,
-    help=(
+    ))
+@click.option('--skip-attr', multiple=True, help=(
         'If specified we avoid rebalance beetween node that have same '
         'attributes specified here. Attributes are in string format.'
-    ),
-)
-@click.option(
-    '--max-shard-size',
-    default=None,
-    type=int,
-    help='Max shard size in bytes. If a shard is larger than this, it will be skipped.',
-)
-@click.option(
-    '--node-role',
-    default='data',
-    help=(
+    ))
+@click.option('--max-shard-size', default=None, type=int,
+    help='Max shard size in bytes. If a shard is larger than this, it will be skipped.')
+@click.option('--node-role', default='data', help=(
         'Filter the nodes for swaps by role. Typically this are the roles '
         'defined in the elasticsearch.yml file. Generally you can use this '
         '"hot" or "warm" or "cold" to filter nodes by their role.'
         'Default is "data", which means all data are considered for rebalance.'
-    )
-)
-@click.option(
-    '--max-recovery-per-node',
-    default=None,
-    type=int,
-    help='Max number of concurrent recoveries per node. If a node has more recoveries, it will be skipped.',
-)
-@click.option(
-    '--infinite-loop',
-    is_flag=True,
-    default=False,
-    help='Run the rebalance in infinite loop.',
-)
-@click.option(
-    '--min-diff',
-    default=0,
-    type=int,
-    help='Min difference in bytes between nodes to consider rebalance.',
-)
-@click.option(
-    '--disable-rebalance',
-    is_flag=True,
-    default=False,
-    help=(
+    ))
+@click.option('--max-recovery-per-node', default=None, type=int, help=(
+    'Max number of concurrent recoveries per node. '
+    'If a node has more recoveries, it will be skipped.'
+    ))
+@click.option('--infinite-loop', default=False, is_flag=True, help='Run the rebalance in infinite loop.')
+@click.option('--min-diff', default=0, type=int, help='Min difference in bytes between nodes to consider rebalance.')
+@click.option('--disable-rebalance', default=False, is_flag=True, help=(
         'Set cluster.routing.rebalance.enable to none before rebalance and restore after. '
         'Generally should be passed and will be used only if --commit is passed.'
-    )
-)
+    ))
+@click.option('--timeout', default=60, type=int, help='Timeout in seconds for Elasticsearch requests and cluster health check.')
 
 
 def rebalance_elasticsearch(
@@ -184,13 +98,14 @@ def rebalance_elasticsearch(
         infinite_loop=False,
         min_diff=0,
         disable_rebalance=False,
+        timeout=60,
 ):
     if es_user and es_password:
         es_client = Elasticsearch(
             es_host, basic_auth=(es_user, es_password), verify_certs=False, ssl_show_warn=False,
-            request_timeout=60)
+            request_timeout=timeout)
     else:
-        es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
+        es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=timeout)
 
 
     # Parse out any attrs
@@ -218,7 +133,7 @@ def rebalance_elasticsearch(
             raise click.ClickException('Cannot have --commit and --print-state!')
 
         # Check we have a healthy cluster
-        utils.wait_cluster_health(es_client, logger)
+        utils.wait_cluster_health(es_client, timeout, logger)
 
         settings_to_set = {}
         if disable_rebalance:
@@ -308,8 +223,8 @@ def rebalance_elasticsearch(
                 utils.print_and_log(logger.info, '# Reroute Performed')
 
             if infinite_loop:
-                utils.print_and_log(logger.info, '# Infinite loop enabled. Sleeping for 60 seconds before next iteration...')
-                utils.sleep(60, logger)
+                utils.print_and_log(logger.info, f'# Infinite loop enabled. Sleeping for {timeout} seconds before next iteration...')
+                utils.sleep(timeout, logger)
                 rebalance_elasticsearch(
                     es_client,
                     es_user=es_user,
@@ -332,6 +247,7 @@ def rebalance_elasticsearch(
                     infinite_loop=infinite_loop,
                     min_diff=min_diff,
                     disable_rebalance=disable_rebalance,
+                    timeout=timeout
                 )
             else:
                 utils.print_and_log(logger.info, '# Infinite loop disabled. Exiting...')
@@ -354,7 +270,7 @@ def rebalance_elasticsearch(
                 utils.set_transient_cluster_settings(es_client, previous_settings)
 
     if commit:
-        utils.print_and_log(logger.info, f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes!')
+        utils.print_and_log(logger.info, f'# Ended rebalanced. Executed {len(all_reroute_commands)} reroutes in last run!')
     else:
         utils.print_and_log(logger.info, f'# Ended rebalanced. Calculated {len(all_reroute_commands)} reroutes!')
 

@@ -484,14 +484,14 @@ def check_raise_health(es_client):
         raise BalanceException(f'{e}')
 
 
-def wait_cluster_health(es_client, logger):
+def wait_cluster_health(es_client, timeout, logger):
     print_and_log(logger.info, "> Checking cluster health...")
     while True:
         try:
             check_cluster_health(es_client)
         except Exception as e:
-            print_and_log(logger.warning, f"Cluster health check failed: {e}, Waiting for 60s...")
-            time.sleep(60)
+            print_and_log(logger.warning, f"Cluster health check failed: {e}, Waiting for {timeout}s...")
+            time.sleep(timeout)
         else:
             break
 
