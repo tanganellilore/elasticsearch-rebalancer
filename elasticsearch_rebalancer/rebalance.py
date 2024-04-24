@@ -261,7 +261,6 @@ def rebalance_elasticsearch(
             if reroute_commands:
                 all_reroute_commands.extend(reroute_commands)
 
-
             if min_node:
                 min_node.rotate()
             if max_node:
@@ -302,7 +301,10 @@ def rebalance_elasticsearch(
                 utils.print_and_log(logger.info, '# Infinite loop disabled. Exiting...')
         else:
             utils.print_and_log(logger.info, 'No Command will be executed. Below the POST to be executed for reroute:')
-            utils.print_and_log(logger.info, '>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
+            if not all_reroute_commands or len(all_reroute_commands) == 0:
+                utils.print_and_log(logger.info, 'No reroute commands to execute.')
+            else:
+                utils.print_and_log(logger.info, '>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(all_reroute_commands)+'\n}')
 
     except Exception as e:
         utils.print_and_log(logger.error, e)
