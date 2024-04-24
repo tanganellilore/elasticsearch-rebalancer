@@ -357,7 +357,7 @@ def attempt_to_find_swap(
     if min_diff:
         if spread_used < min_diff:
             print_and_log(logger.warning, f'Spread is less than min-diff: {format_shard_weight_function(spread_used)} < {format_shard_weight_function(min_diff)}')
-            print('Cluster is balanced...wait')
+            print_and_log(logger.info, 'Cluster is balanced...wait')
             return []
 
 
