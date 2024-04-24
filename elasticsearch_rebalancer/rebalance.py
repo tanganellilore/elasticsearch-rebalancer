@@ -126,10 +126,10 @@ logger.addHandler(ch)
     help='Run the rebalance in infinite loop.',
 )
 @click.option(
-    '--max-diff',
+    '--min-diff',
     default=0,
     type=int,
-    help='Max difference in bytes between nodes to consider rebalance.',
+    help='Min difference in bytes between nodes to consider rebalance.',
 )
 @click.option(
     '--disable-rebalance',
@@ -160,7 +160,7 @@ def rebalance_elasticsearch(
         node_role="data",
         max_recovery_per_node=None,
         infinite_loop=False,
-        max_diff=0,
+        min_diff=0,
         disable_rebalance=False,
 ):
     # Parse out any attrs
@@ -255,7 +255,7 @@ def rebalance_elasticsearch(
                 skip_attrs_list=skip_attrs,
                 node_skip_attrs_map=node_skip_attrs_map,
                 max_recovery_per_node=max_recovery_per_node,
-                max_diff=max_diff,
+                min_diff=min_diff,
             )
 
             if reroute_commands:
@@ -295,7 +295,7 @@ def rebalance_elasticsearch(
                     node_role=node_role,
                     max_recovery_per_node=max_recovery_per_node,
                     infinite_loop=infinite_loop,
-                    max_diff=max_diff,
+                    min_diff=min_diff,
                     disable_rebalance=disable_rebalance,
                 )
             else:

@@ -329,7 +329,7 @@ def attempt_to_find_swap(
     skip_attrs_list=None,
     node_skip_attrs_map=None,
     max_recovery_per_node=None,
-    max_diff=0,
+    min_diff=0,
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
@@ -354,10 +354,9 @@ def attempt_to_find_swap(
         f'spread={format_shard_weight_function(spread_used)}'
     ))
 
-    if max_diff:
-        if spread_used < max_diff:
-            print_and_log(logger, "")
-            print_and_log(logger, f'Spread is less than max diff: {format_shard_weight_function(spread_used)} < {format_shard_weight_function(max_diff)}')
+    if min_diff:
+        if spread_used < min_diff:
+            print_and_log(logger, f'Spread is less than max diff: {format_shard_weight_function(spread_used)} < {format_shard_weight_function(min_diff)}')
             print('Cluster is balanced...wait')
             return []
 
@@ -465,7 +464,7 @@ def attempt_to_find_swap(
     click.echo((
         f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) '
         f'({format_shard_weight_function(min_weight)} '
-        f'-> {format_shard_weight_function(min_node["weight"])})'
+        f'-> {format_shard_weight_function(min_node["weight"])})\n'
     ))
 
     reroute_commands = [
