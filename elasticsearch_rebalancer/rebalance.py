@@ -165,7 +165,7 @@ logger.addHandler(ch)
 def rebalance_elasticsearch(
         es_host,
         es_user=None,
-        es_pwd=None,
+        es_password=None,
         iterations=1,
         used_shards=None,
         attr=None,
@@ -185,9 +185,9 @@ def rebalance_elasticsearch(
         min_diff=0,
         disable_rebalance=False,
 ):
-    if es_user and es_pwd:
+    if es_user and es_password:
         es_client = Elasticsearch(
-            es_host, basic_auth=(es_user, es_pwd), verify_certs=False, ssl_show_warn=False,
+            es_host, basic_auth=(es_user, es_password), verify_certs=False, ssl_show_warn=False,
             request_timeout=60)
     else:
         es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=60)
