@@ -336,10 +336,10 @@ def attempt_to_find_swap(
     max_weight = max_node['weight']
     spread_used = round(max_weight - min_weight, 2)
 
-    print_and_log(logger.info, f"""> Weight used over {len(nodes)} nodes: \
-                min={format_shard_weight_function(min_weight)}, \
-                max={format_shard_weight_function(max_weight)}, \
-                spread={format_shard_weight_function(spread_used)}"""
+    print_and_log(logger.info, f'> Weight used over {len(nodes)} nodes: \
+min={format_shard_weight_function(min_weight)}, \
+max={format_shard_weight_function(max_weight)}, \
+spread={format_shard_weight_function(spread_used)}'
     )
 
     if min_diff:
