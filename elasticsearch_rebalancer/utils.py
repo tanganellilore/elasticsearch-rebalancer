@@ -76,15 +76,16 @@ def check_cluster_health(es_client):
         raise Exception(f'ES is already relocating {relocating_shards} shards!')
 
 
-def wait_for_no_relocations(es_client):
+def wait_for_no_relocations(es_client, logger):
+
     while True:
         health = get_cluster_health(es_client)
 
         relocating_shards = health['relocating_shards']
         if not relocating_shards:
             break
-
-        time.sleep(10)
+        print_and_log(logger.info, f'Waiting 30s for relocations to complete... {relocating_shards} shards remaining')
+        time.sleep(30)
 
 
 def execute_reroute_commands(es_client, commands):
@@ -438,7 +439,7 @@ spread={format_shard_weight_function(spread_used)}'
         print_and_log(logger.info, f'> Recommended swap for: {max_shard["id"]} \
 ({format_shard_weight_function(max_shard["weight"])}) <> {min_shard["id"]} \
 ({format_shard_weight_function(min_shard["weight"])})')
-    
+
     print_and_log(logger.info, f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) \
 ({format_shard_weight_function(max_weight)} -> {format_shard_weight_function(max_node["weight"])})')
     print_and_log(logger.info, f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) \
@@ -467,15 +468,13 @@ spread={format_shard_weight_function(spread_used)}'
             },
         })
 
-    return reroute_commands
-
+    return reroute_commands  
 
 def print_command(command, logger):
     args = command['move']
     print_and_log(logger.info, f'> Executing reroute of {args["index"]}-{args["shard"]} \
         from {args["from_node"]} -> {args["to_node"]}'
     )
-
 
 def check_raise_health(es_client):
     # Check we're good to go
@@ -500,15 +499,15 @@ def execute_reroutes(es_client, commands, logger):
     try:
         print_and_log(logger.info, "> Executing reroute...")
         execute_reroute_commands(es_client, commands)
-    except requests.HTTPError as e:
+    except Exception as e:
         print_and_log(logger, f'Failed to execute reroute commands: {e}')
         return False
     # Parallel reroute worked - so just wait & return
     else:
-        print_command('>Command:  \nPOST /_cluster/reroute \n{ \n"commands": \n' + json.dumps(commands)+'\n}', logger)
-
+        for command in commands:
+            print_command(command, logger)
         print_and_log(logger, 'Waiting for relocations to complete...')
-        wait_for_no_relocations(es_client)
+        wait_for_no_relocations(es_client, logger)
         return True
 
 
