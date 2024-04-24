@@ -262,6 +262,7 @@ def parse_attr(attributes):
         attr_map[key] = value
     return attr_map
 
+
 def extract_attrs(attrs, skip_attrs):
     extract_attr = {}
     if not attrs or not skip_attrs:
@@ -271,6 +272,7 @@ def extract_attrs(attrs, skip_attrs):
         if attrs.get(skip_attr):
             extract_attr[skip_attr] = attrs.get(skip_attr)
     return extract_attr
+
 
 def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=None):
     if not isinstance(nodes, list):
@@ -400,12 +402,14 @@ def attempt_to_find_swap(
             if (
                 use_shard_id 
                 and max_node['name'] not in shard_id_to_node_names[shard['id']]
+                and not same_attr
             ):
                 min_shard = shard
                 break
             elif (
                 not use_shard_id 
                 and max_node['name'] not in index_to_node_names[shard['index']]
+                and not same_attr
             ):
                 min_shard = shard
                 break
@@ -550,3 +554,7 @@ def print_node_shard_states(
             f'weight: {format_shard_weight_function(node["weight"])}'
             f' ({node["weight_percentage"]})%',
         )
+
+def print_and_log(logger, message):
+    logger(message)
+    click.echo(message)

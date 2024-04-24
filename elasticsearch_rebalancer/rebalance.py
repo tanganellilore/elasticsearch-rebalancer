@@ -8,6 +8,8 @@ import requests
 import click
 from . import rebalance
 
+# create 
+
 @click.command()
 @click.argument('es_host')
 @click.option(
@@ -199,12 +201,12 @@ def rebalance_elasticsearch(
             return
 
         click.echo('Investigating rebalance options...')
-   
+
         if skip_attrs:
             node_skip_attrs_map = utils.get_nodes_attributes_map(es_host)
         else:
             node_skip_attrs_map = None
-      
+
         all_reroute_commands = []
         used_shards = set()
 
