@@ -512,7 +512,7 @@ def wait_cluster_health(es_host, logger):
         try:
             check_cluster_health(es_host)
         except Exception as e:
-            print_and_log(logger, f"Cluster health check failed: {e}, Waiting for 60s...")
+            print_and_log(logger.warning, f"Cluster health check failed: {e}, Waiting for 60s...")
             time.sleep(60)
         else:
             break
