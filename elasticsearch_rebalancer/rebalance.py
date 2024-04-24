@@ -73,6 +73,8 @@ logger.addHandler(ch)
 )
 @click.option(
     '--override-watermarks',
+    is_flag=False,
+    default=False
     help=(
         'Temporarily override the Elasticsearch low & high disk '
         'watermark settings. Makes it possible to parallel swap '
@@ -189,6 +191,7 @@ def rebalance_elasticsearch(
         # Check we have a healthy cluster
         utils.wait_cluster_health(es_host, logger)
 
+        settings_to_set = {}
         if disable_rebalance:
             utils.print_and_log(logger.info, 'Disabling cluster rebalance...')
             settings_to_set = {'cluster.routing.rebalance.enable': 'none'}
