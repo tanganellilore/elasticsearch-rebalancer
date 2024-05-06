@@ -76,7 +76,7 @@ def check_cluster_health(es_client):
         raise Exception(f'ES is already relocating {relocating_shards} shards!')
 
 
-def wait_for_no_relocations(es_client, logger):
+def wait_for_no_relocations(es_client, timeout, logger):
 
     while True:
         health = get_cluster_health(es_client)
@@ -84,8 +84,8 @@ def wait_for_no_relocations(es_client, logger):
         relocating_shards = health['relocating_shards']
         if not relocating_shards:
             break
-        print_and_log(logger.info, f'Waiting 30s for relocations to complete... {relocating_shards} shards remaining')
-        time.sleep(30)
+        print_and_log(logger.info, f'Waiting {timeout}s for relocations to complete... {relocating_shards} shards remaining')
+        time.sleep(timeout)
 
 
 def execute_reroute_commands(es_client, commands):
@@ -495,7 +495,7 @@ def wait_cluster_health(es_client, timeout, logger):
         else:
             break
 
-def execute_reroutes(es_client, commands, logger):
+def execute_reroutes(es_client, commands, timeout, logger):
     try:
         print_and_log(logger.info, "> Executing reroute...")
         execute_reroute_commands(es_client, commands)
@@ -507,7 +507,7 @@ def execute_reroutes(es_client, commands, logger):
         for command in commands:
             print_command(command, logger)
         print_and_log(logger.info, 'Waiting for relocations to complete...')
-        wait_for_no_relocations(es_client, logger)
+        wait_for_no_relocations(es_client, timeout, logger)
         return True
 
 

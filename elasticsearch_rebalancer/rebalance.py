@@ -216,7 +216,7 @@ def rebalance_elasticsearch(
                 max_node.rotate()
 
         if commit:
-            reroute_result = utils.execute_reroutes(es_client, all_reroute_commands, logger)
+            reroute_result = utils.execute_reroutes(es_client, all_reroute_commands, timeout, logger)
             if not reroute_result:
                 raise utils.BalanceException('Error during reroute')
             else:

@@ -1,10 +1,10 @@
 from setuptools import setup
 
 REQUIREMENTS = (
-    'click',
-    'humanize',
-    'requests',
-    'elasticsearch',
+    'click>=8.1.7',
+    'humanize>=4.9.0',
+    'requests>=2.31.0',
+    'elasticsearch>=8.13.0',
 )
 
 
