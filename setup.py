@@ -16,14 +16,14 @@ if __name__ == '__main__':
         author='Lorenzo Tanganelli',
         author_email='tbd',
         packages=[
-            'elasticsearch_rebalancer',
+            'elasticsearch_rebalance',
         ],
-        url='https://github.com/EDITD/elasticsearch-rebalancer',
+        url='https://github.com/tanganellilore/elasticsearch-rebalancer',
         python_requires='>=3.6',
         install_requires=REQUIREMENTS,
         entry_points={
             'console_scripts': (
-                'es-rebalance=elasticsearch_rebalancer.rebalance:rebalance_elasticsearch',
+                'es-rebalance=elasticsearch_rebalance.rebalance:rebalance_elasticsearch',
             ),
         },
     )

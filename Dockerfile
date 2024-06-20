@@ -2,7 +2,7 @@ FROM python:3.11
 
 LABEL maintainer="Lorenzo Tanganelli"
 
-COPY ./* /elasticsearch_rebalancer/
+COPY ./* /elasticsearch_rebalance/
 
-RUN python /elasticsearch_rebalancer/setup.py install
+RUN python /elasticsearch_rebalance/setup.py install
 

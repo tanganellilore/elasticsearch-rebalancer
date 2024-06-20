@@ -10,7 +10,7 @@ from . import utils
 
 
 # create logger with loglevel
-logger = logging.getLogger("elasticsearch_rebalancer")
+logger = logging.getLogger("elasticsearch_rebalance")
 logger.setLevel(logging.INFO)
 
 # print log to console
@@ -47,13 +47,15 @@ logger.addHandler(ch)
         'shards even when the most full nodes are on the limit.'
     ))
 @click.option('--use-shard-id', default=False, is_flag=True, help=(
-        'If passed, we use the shard_id created in runtime instead '
+        'If passed, we use an internal unique shard_id instead '
         'index name for shard algoritms. Without this params if index '
-        'of shard is in the max and min node, shard will be skipped.'
+        'of shard is in the max and min node, shard will be skipped. To be used '
+        'when indices have shards and you want to rebalance shards between nodes.'
     ))
 @click.option('--skip-attr', multiple=True, help=(
         'If specified we avoid rebalance beetween node that have same '
-        'attributes specified here. Attributes are in string format.'
+        'attributes specified here. Attributes are in string format and separated by space. '
+        'Example: --skip-attr rack_id key_1 key_2'
     ))
 @click.option('--max-shard-size', default=None, type=int,
     help='Max shard size in bytes. If a shard is larger than this, it will be skipped.')
