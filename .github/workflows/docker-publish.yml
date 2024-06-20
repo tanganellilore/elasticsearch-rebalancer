@@ -36,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          images: tanganellilore/es-rebalance
 
       - name: Build and push Docker image
         id: push
@@ -52,7 +52,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-name: tanganellilore/es-rebalance
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
       
