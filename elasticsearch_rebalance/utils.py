@@ -431,7 +431,8 @@ spread={format_shard_weight_function(spread_used)}'
         max_node['weight'] += min_shard['weight']
 
         if min_node['weight'] >= max_node['weight']:
-            return None
+            print_and_log(logger.warning, f' Min-node become biggerthan Maxnode with this reroute. We will skip it')
+            return []
 
     if one_way:
         print_and_log(logger.info, f'> Recommended move for: {max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])})')
