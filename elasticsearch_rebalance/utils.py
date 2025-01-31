@@ -226,7 +226,7 @@ def combine_nodes_and_shards(nodes, shards):
     # logger.debug(f"Total node shards: {total_shards}")
     for node in nodes:
         if node['name'] not in node_name_to_shards:
-            continue
+            node_name_to_shards[node['name']] = []
 
         # node['weight'] = sum(
         #     shard['weight'] for shard in node_name_to_shards[node['name']]
@@ -413,10 +413,11 @@ spread={format_shard_weight_function(spread_used)}'
                 min_shard = shard
                 break
     else:
-        raise BalanceException((
-            'Could not find suitable small shard to move to '
-            f'{min_node["name"]}!'
-        ))
+        if not one_way:
+            raise BalanceException((
+                'Could not find suitable small shard to move to '
+                f'{min_node["name"]}!'
+            ))
 
     # Update shard + node info according to the reroutes
     used_shards.add(max_shard['id'])
