@@ -326,11 +326,13 @@ def attempt_to_find_swap(
 
     max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
     if not max_node:
+        print_and_log(logger.error, f'Not Found node: '{max_node_name}'. Skip this iteration'
         return None
 
     max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
     min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
     if not min_node:
+        print_and_log(logger.error, f'Not Found node: '{min_node_name}'. Skip this iteration'
         return None
 
     min_weight = min_node['weight']
