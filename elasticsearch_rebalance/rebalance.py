@@ -207,7 +207,7 @@ def rebalance_elasticsearch(
                 min_diff=min_diff,
             )
 
-            if reroute_commands is None:
+            if reroute_commands is not None:
                 all_reroute_commands.extend(reroute_commands)
             else:
                 break
