@@ -25,6 +25,7 @@ logger.addHandler(ch)
 # add auth params
 @click.option('--es-user', envvar='ES_USER', default=None, help='Elasticsearch user.')
 @click.option('--es-password', envvar='ES_PASSWORD', default=None, help='Elasticsearch password.')
+@click.option('--kb-cookie', envvar='KB_COOKIE', default=None, help='Kibana cookies for auth.')
 
 @click.option('--iterations', default=1, type=int, help='Number of iterations (swaps) to execute.')
 @click.option('--attr', multiple=True, help=(
@@ -71,6 +72,7 @@ logger.addHandler(ch)
     ))
 @click.option('--infinite-loop', default=False, is_flag=True, help='Run the rebalance in infinite loop.')
 @click.option('--min-diff', default=0, type=int, help='Min difference in bytes between nodes to consider rebalance.')
+@click.option('--weight-based-on', default='used', type=str, help='Weight calculation based on used or free disk space. Accepted values: used, free. Default is used.')
 @click.option('--disable-rebalance', default=False, is_flag=True, help=(
         'Set cluster.routing.rebalance.enable to none before rebalance and restore after. '
         'Generally should be passed and will be used only if --commit is passed.'
@@ -82,6 +84,7 @@ def rebalance_elasticsearch(
         es_host,
         es_user=None,
         es_password=None,
+        kb_cookie=None,
         iterations=1,
         used_shards=None,
         attr=None,
@@ -99,6 +102,7 @@ def rebalance_elasticsearch(
         max_recovery_per_node=None,
         infinite_loop=False,
         min_diff=0,
+        weight_based_on='used',
         disable_rebalance=False,
         timeout=60,
 ):
@@ -106,6 +110,9 @@ def rebalance_elasticsearch(
         es_client = Elasticsearch(
             es_host, basic_auth=(es_user, es_password), verify_certs=False, ssl_show_warn=False,
             request_timeout=timeout)
+    elif kb_cookie:
+        from .kibana import Kibana
+        es_client = Kibana(es_host, kb_cookie)
     else:
         es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=timeout)
 
@@ -121,10 +128,8 @@ def rebalance_elasticsearch(
         skip_attrs = skip_attr
 
     # Turn min/max node lists into deque instances
-    if min_node:
-        min_node = deque(min_node)
-    if max_node:
-        max_node = deque(max_node)
+    min_node = deque(min_node)
+    max_node = deque(max_node)
 
     utils.print_and_log(logger.info, '# Elasticsearch Rebalancer')
     utils.print_and_log(logger.info, f'> User: {es_user}')
@@ -157,7 +162,7 @@ def rebalance_elasticsearch(
 
     try:
         utils.print_and_log(logger.debug, 'Loading nodes...')
-        nodes = utils.get_nodes(es_client, role=node_role, attrs=attrs)
+        nodes = utils.get_nodes(es_client, role=node_role, attrs=attrs, weight_based_on=weight_based_on)
         if not nodes:
             utils.print_and_log(logger.error, 'No nodes found! Exit')
             exit(1)
@@ -167,6 +172,7 @@ def rebalance_elasticsearch(
         utils.print_and_log(logger.debug, 'Loading shards...')
         shards = utils.get_shards(
             es_client,
+            logger,
             attrs=attrs,
             index_name_filter=index_name,
             max_shard_size=max_shard_size
@@ -179,7 +185,8 @@ def rebalance_elasticsearch(
 
         if print_state:
             utils.print_and_log(logger.info, 'Nodes ordered by weight:')
-            utils.print_node_shard_states(nodes, logger.info)
+            ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = utils.combine_nodes_and_shards(nodes, shards)
+            utils.print_node_shard_states(ordered_nodes, logger.info)
             return
 
         utils.print_and_log(logger.debug, 'Investigating rebalance options...')
@@ -209,8 +216,9 @@ def rebalance_elasticsearch(
 
             if reroute_commands is not None:
                 all_reroute_commands.extend(reroute_commands)
-            else:
-                break
+            # else:
+            #     # break
+            #     continue
 
             if min_node:
                 min_node.rotate()

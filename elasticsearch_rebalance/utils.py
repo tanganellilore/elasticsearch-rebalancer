@@ -1,5 +1,5 @@
 from collections import defaultdict
-from fnmatch import fnmatch
+import re
 import time
 import json
 
@@ -114,7 +114,7 @@ def set_transient_cluster_settings(es_client, path_to_value):
     es_client.cluster.put_settings(transient=path_to_value)
 
 
-def get_nodes(es_client, role="data", attrs=None):
+def get_nodes(es_client, role="data", attrs=None, weight_based_on='used'):
     nodes = es_client.nodes.stats()['nodes']
     filtered_nodes = []
 
@@ -130,9 +130,10 @@ def get_nodes(es_client, role="data", attrs=None):
             if recovery['source_node'] == node_data['name'] or recovery['target_node'] == node_data['name']:
                 node_data['recovery'].append(recovery)
 
-        node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
-
-        node_data["total_shards"] = node_data.get("indices", {}).get("shard_stats", {}).get("total_count", 0)
+        if weight_based_on == 'used':
+            node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
+        else:
+            node_data['weight'] = -node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) + node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
 
         filtered_nodes.append(node_data)
 
@@ -159,6 +160,7 @@ def get_recovery(es_client):
 
 def get_shards(
     es_client,
+    logger,
     attrs=None,
     index_name_filter=None,
     max_shard_size=None,
@@ -179,7 +181,7 @@ def get_shards(
         if not matches_attrs(index_attrs, attrs):
             continue
 
-        if index_name_filter and not fnmatch(index_name, index_name_filter):
+        if index_name_filter and not re.match(index_name_filter, index_name):
             continue
 
         filtered_index_names.append(index_name)
@@ -187,14 +189,13 @@ def get_shards(
     shards = es_client.cat.shards(format='json', bytes='b')
 
     filtered_shards = []
-
     for shard in shards:
         if (
             shard['state'] != 'STARTED'
             or shard['index'] not in filtered_index_names
             or (max_shard_size and get_shard_weight_function(shard) > max_shard_size)
         ):
-            # logger.debug(f"skip shard: {shard['index']} {shard['shard']} {shard['node']} {shard['store']}")
+            # print_and_log(logger.debug, f"skip shard: {shard['index']} {shard['shard']} {shard['node']} {shard['store']}")
             continue
 
         shard['id'] = f'{shard["index"]}-{shard["shard"]}'
@@ -227,6 +228,8 @@ def combine_nodes_and_shards(nodes, shards):
     for node in nodes:
         if node['name'] not in node_name_to_shards:
             node_name_to_shards[node['name']] = []
+            
+        node['total_shards'] = len(node_name_to_shards[node['name']])
 
         # node['weight'] = sum(
         #     shard['weight'] for shard in node_name_to_shards[node['name']]
@@ -288,7 +291,8 @@ def find_node(nodes, node_name=None, skip_attr_map=None, max_recovery_per_node=N
             return None
 
     for node in nodes:
-        if node['name'] == node_name:
+        # if node['name'] == node_name:
+        if re.match(node_name, node['name']):
             if max_recovery_per_node and len(node.get('recovery', [])) >= max_recovery_per_node:
                 continue
             node['recovery'].append({'shard': 'new_shard_allocated'})
@@ -326,13 +330,13 @@ def attempt_to_find_swap(
 
     max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
     if not max_node:
-        print_and_log(logger.error, f"Not Found node: '{max_node_name}'. Skip this iteration")
+        print_and_log(logger.error, f"Not Found max_node: '{max_node_name}'. Skip this iteration")
         return None
 
     max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
     min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
     if not min_node:
-        print_and_log(logger.error, f"Not Found node: '{min_node_name}'. Skip this iteration")
+        print_and_log(logger.error, f"Not Found min_node: '{min_node_name}'. Skip this iteration")
         return None
 
     min_weight = min_node['weight']
@@ -383,10 +387,12 @@ spread={format_shard_weight_function(spread_used)}'
                 max_shard = shard
                 break
     else:
-        raise BalanceException((
-            'Could not find suitable large shard to move to '
-            f'{max_node["name"]}!'
-        ))
+        # raise BalanceException((
+        #     'Could not find suitable large shard to move to '
+        #     f'{max_node["name"]}!'
+        # ))
+        print_and_log(logger.warning, f'Could not find suitable large shard to move to {max_node["name"]}!')
+        return None
 
     for shard in min_node_shards:
         if shard['id'] not in used_shards:
@@ -441,13 +447,13 @@ spread={format_shard_weight_function(spread_used)}'
         print_and_log(logger.info, f'> Recommended move for: {max_shard["id"]} ({format_shard_weight_function(max_shard["weight"])})')
     else:
         print_and_log(logger.info, f'> Recommended swap for: {max_shard["id"]} \
-({format_shard_weight_function(max_shard["weight"])}) <> {min_shard["id"]} \
-({format_shard_weight_function(min_shard["weight"])})')
+({format_shard_weight_function(abs(max_shard["weight"]))}) <> {min_shard["id"]} \
+({format_shard_weight_function(abs(min_shard["weight"]))})')
 
     print_and_log(logger.info, f'  maxNode: {max_node["name"]} ({max_node["total_shards"]} shards) \
-({format_shard_weight_function(max_weight)} -> {format_shard_weight_function(max_node["weight"])})')
+({format_shard_weight_function(abs(max_weight))} -> {format_shard_weight_function(abs(max_node["weight"]))})')
     print_and_log(logger.info, f'  minNode: {min_node["name"]} ({min_node["total_shards"]} shards) \
-({format_shard_weight_function(min_weight)} -> {format_shard_weight_function(min_node["weight"])})\n'
+({format_shard_weight_function(abs(min_weight))} -> {format_shard_weight_function(abs(min_node["weight"]))})\n'
     )
     
 
@@ -522,10 +528,7 @@ def print_node_shard_states(
 ):
     for node in nodes:
         print_and_log(logger, 
-            f'\n> Node: {node["name"]},\
-            \nshards: {node["total_shards"]},\
-            \nweight: {format_shard_weight_function(node["weight"])} \
-            ({node["weight_percentage"]})%'
+            f'> Node: {node["name"]}, shards: {node["total_shards"]}, weight: {format_shard_weight_function(node["weight"])} ({node["weight_percentage"]})%'
         )
 
 def print_and_log(logger, message):
