@@ -50,9 +50,11 @@ class CatClient():
         return self.kibana.query(url, method="GET")
 
 class Kibana:
-    def __init__(self, base_url, cookie) -> None:
+    def __init__(self, base_url, username, password, cookie) -> None:
         base_url_parsed = base_url if base_url[-1] != "/" else base_url[:-1]
         self.cookie = cookie
+        self.username = username
+        self.password = password
         self.base_url = base_url_parsed
         self.kibana_url = base_url_parsed if 'proxy' in base_url_parsed else urljoin(base_url_parsed, '/api/console/proxy')
         self.cluster = ClusterClient(self)
@@ -74,9 +76,17 @@ class Kibana:
     def request(self, url: str, method: str = "post", **kwargs) -> requests.Response:
         headers = kwargs.pop("headers", {})
         headers.update({
-            "Cookie": self.cookie,
             'Kbn-Xsrf': 'kibana'
         })
+        if self.cookie:
+            headers.update({
+                'Cookie': self.cookie
+            })
+        elif self.username and self.password:
+            kwargs.update({
+                'auth': (self.username, self.password)
+            })
+        
         response = requests.request(method=method, url=url, headers=headers, **kwargs)
         response.raise_for_status()
         return response.json()

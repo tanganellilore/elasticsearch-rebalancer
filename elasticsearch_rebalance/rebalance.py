@@ -23,9 +23,10 @@ logger.addHandler(ch)
 @click.command()
 @click.argument('es_host')
 # add auth params
-@click.option('--es-user', envvar='ES_USER', default=None, help='Elasticsearch user.')
-@click.option('--es-password', envvar='ES_PASSWORD', default=None, help='Elasticsearch password.')
-@click.option('--kb-cookie', envvar='KB_COOKIE', default=None, help='Kibana cookies for auth.')
+@click.option('--es-user', envvar='ES_USER', default=None, help='Elasticsearch/Kibana user.')
+@click.option('--es-password', envvar='ES_PASSWORD', default=None, help='Elasticsearch/Kibana password.')
+@click.option('--use-kibana', is_flag=True, default=False, help='Use Kibana for connecting to Elasticsearch, instead of direct ES connection.')
+@click.option('--kb-cookie', envvar='KB_COOKIE', default=None, help='Kibana cookies for auth instead of user/password.')
 
 @click.option('--iterations', default=1, type=int, help='Number of iterations (swaps) to execute.')
 @click.option('--attr', multiple=True, help=(
@@ -85,6 +86,7 @@ def rebalance_elasticsearch(
         es_user=None,
         es_password=None,
         kb_cookie=None,
+        use_kibana=False,
         iterations=1,
         used_shards=None,
         attr=None,
@@ -106,16 +108,14 @@ def rebalance_elasticsearch(
         disable_rebalance=False,
         timeout=60,
 ):
-    if es_user and es_password:
-        es_client = Elasticsearch(
-            es_host, basic_auth=(es_user, es_password), verify_certs=False, ssl_show_warn=False,
-            request_timeout=timeout)
-    elif kb_cookie:
+    if use_kibana:
         from .kibana import Kibana
-        es_client = Kibana(es_host, kb_cookie)
+        es_client = Kibana(es_host, es_user, es_password, kb_cookie)
     else:
-        es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=timeout)
-
+        if es_user and es_password:
+            es_client = Elasticsearch(es_host, basic_auth=(es_user, es_password), verify_certs=False, ssl_show_warn=False, request_timeout=timeout)        
+        else:
+            es_client = Elasticsearch(es_host, verify_certs=False, ssl_show_warn=False, request_timeout=timeout)
 
     # Parse out any attrs
     attrs = {}
