@@ -133,7 +133,7 @@ def get_nodes(es_client, role="data", attrs=None, weight_based_on='used'):
         if weight_based_on == 'used':
             node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) - node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
         else:
-            node_data['weight'] = -node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) + node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
+            node_data['weight'] = node_data.get('fs', {}).get('total', {}).get('total_in_bytes', 0) + node_data.get('fs', {}).get('total', {}).get('available_in_bytes', 0)
 
         filtered_nodes.append(node_data)
 
@@ -323,18 +323,26 @@ def attempt_to_find_swap(
     node_skip_attrs_map=None,
     max_recovery_per_node=None,
     min_diff=0,
+    weight_based_on='used',
 ):
     ordered_nodes, node_name_to_shards, index_to_node_names, shard_id_to_node_names = (
         combine_nodes_and_shards(nodes, shards)
     )
-
-    max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
+    
+    if weight_based_on == 'used':
+        max_node = find_node(reversed(ordered_nodes), node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
+    else:
+        max_node = find_node(ordered_nodes, node_name=max_node_name, max_recovery_per_node=max_recovery_per_node)
     if not max_node:
         print_and_log(logger.error, f"Not Found max_node: '{max_node_name}'. Skip this iteration")
         return None
 
     max_node_skip_attr_map = extract_attrs(max_node.get('attributes'), skip_attrs_list)
-    min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
+    if weight_based_on == 'used':
+        min_node = find_node(ordered_nodes, node_name=min_node_name, skip_attr_map=max_node_skip_attr_map, max_recovery_per_node=max_recovery_per_node)
+    else:
+        min_node = find_node(reversed(ordered_nodes), node_name=min_node_name, skip_attr_map=max_node_skip_attr_map,  max_recovery_per_node=max_recovery_per_node)
+        
     if not min_node:
         print_and_log(logger.error, f"Not Found min_node: '{min_node_name}'. Skip this iteration")
         return None
@@ -439,8 +447,11 @@ spread={format_shard_weight_function(spread_used)}'
         min_node['weight'] -= min_shard['weight']
         max_node['weight'] += min_shard['weight']
 
-        if min_node['weight'] >= max_node['weight']:
-            print_and_log(logger.warning, f' Min-node become biggerthan Maxnode with this reroute. We will skip it')
+        if min_node['weight'] >= max_node['weight'] and weight_based_on == 'used':
+            print_and_log(logger.warning, f' Min-node become bigger than Maxnode with this reroute. We will skip it')
+            return []
+        elif min_node['weight'] <= max_node['weight'] and weight_based_on != 'used':
+            print_and_log(logger.warning, f' Min-node become bigger than Maxnode with this reroute. We will skip it')
             return []
 
     if one_way:

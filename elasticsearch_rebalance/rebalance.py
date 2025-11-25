@@ -212,6 +212,7 @@ def rebalance_elasticsearch(
                 node_skip_attrs_map=node_skip_attrs_map,
                 max_recovery_per_node=max_recovery_per_node,
                 min_diff=min_diff,
+                weight_based_on=weight_based_on
             )
 
             if reroute_commands is not None:
