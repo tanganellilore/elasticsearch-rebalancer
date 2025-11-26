@@ -240,6 +240,8 @@ def rebalance_elasticsearch(
                     es_client,
                     es_user=es_user,
                     es_pwd=es_password,
+                    use_kibana=use_kibana,
+                    kb_cookie=kb_cookie,
                     iterations=iterations,
                     used_shards=used_shards,
                     attr=attr,
@@ -257,6 +259,7 @@ def rebalance_elasticsearch(
                     max_recovery_per_node=max_recovery_per_node,
                     infinite_loop=infinite_loop,
                     min_diff=min_diff,
+                    weight_based_on=weight_based_on,
                     disable_rebalance=disable_rebalance,
                     timeout=timeout
                 )
